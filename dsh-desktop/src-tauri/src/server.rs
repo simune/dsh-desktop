@@ -745,6 +745,15 @@ fn ensure_usage_stats_bundle(
             use std::os::windows::fs::symlink_dir;
             if symlink_dir(&plugin_dir, &link).is_ok() {
                 log(logs, log_lines, &format!("[app] profile node_modules 已链接 {BUNDLE}"));
+            } else if junction::create(&plugin_dir, &link).is_ok() {
+                // symlink_dir 需要管理员/开发者模式;非特权环境回退到 junction(无需提权,NTFS 即可)
+                log(logs, log_lines, &format!("[app] profile node_modules 已联接(junction) {BUNDLE}"));
+            } else {
+                log(
+                    logs,
+                    log_lines,
+                    &format!("[app] 警告:无法创建 {BUNDLE} 链接(symlink 与 junction 均失败)"),
+                );
             }
         }
     }
