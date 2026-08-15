@@ -11,6 +11,18 @@
 > 1. 工具链中硬链接原子写入(link 系统调用)不可用 → write/edit 工具需改用 bash 直写;
 > 2. `tauri-build` 遍历生成目录读到 `._default.toml` 报 `stream did not contain valid UTF-8` → 通过 `dsh-desktop/.cargo/config.toml` 将 cargo target-dir 指向 APFS 卷(`~/Library/Caches/dsh-desktop/target`)解决。
 
+### M3 增强(2026-08-15)
+
+| 项 | 结果 |
+|---|---|
+| M3.1 托盘 | ✅ 菜单:状态(server-status 事件驱动更新)/打开主界面/重启服务/退出;左键点击显示主窗口 |
+| M3.2 设置窗口 | ✅ 独立窗口加载 `index.html?view=settings`;DSH_HOME/端口策略/日志行数/开机自启/日志查看;设置持久化 settings.json;实测设置页 page-load |
+| M3.3 开机自启 | ✅ tauri-plugin-autostart(LaunchAgent);set_settings 中即时生效 |
+| M3.4 升级策略 | ✅ 内置 dsh 随 app 发布(版本锁定 0.1.0-rc.6);bundled 运行时 + 真实 profile 兼容(见 M2.3);覆盖安装 = 重新构建 .app 后运行正常(依赖 dsh 自愈) |
+| M3.5 跨平台预留 | ✅ 代码层:process_group(tool: unix)/taskkill /T(win)、platform_dir/node_exe cfg 分支、运行时探测链抽象;不实际适配 Windows/Linux |
+
+> 待人工确认项:开机自启需重启系统验证;托盘/设置窗口交互(点按菜单、保存)需人工点验——自动化已覆盖"窗口创建+页面加载+无 panic"。
+
 ### M2 打包分发(2026-08-15)
 
 | 项 | 结果 |
