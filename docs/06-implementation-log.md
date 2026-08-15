@@ -57,7 +57,7 @@
 | M3.2 设置窗口 | ✅ 独立窗口加载 `index.html?view=settings`;DSH_HOME/端口策略/日志行数/开机自启/日志查看;设置持久化 settings.json;实测设置页 page-load |
 | M3.3 开机自启 | ✅ tauri-plugin-autostart(LaunchAgent);set_settings 中即时生效 |
 | M3.4 升级策略 | ✅ 内置 dsh 随 app 发布(版本锁定 0.1.0-rc.6);bundled 运行时 + 真实 profile 兼容(见 M2.3);覆盖安装 = 重新构建 .app 后运行正常(依赖 dsh 自愈) |
-| M3.5 跨平台预留 | ✅ 代码层:process_group(tool: unix)/taskkill /T(win)、platform_dir/node_exe cfg 分支、运行时探测链抽象;不实际适配 Windows/Linux |
+| M3.5 跨平台 | ✅ Windows x64 实际适配:PATH/shim→bin.js、CREATE_NEW_PROCESS_GROUP+CREATE_NO_WINDOW、taskkill /T /F、USERPROFILE cwd、NSIS(SimpChinese)、vendor-node(win-x64→win32-x64);Linux 仍预留 |
 
 > 待人工确认项:开机自启需重启系统验证;托盘/设置窗口交互(点按菜单、保存)需人工点验——自动化已覆盖"窗口创建+页面加载+无 panic"。
 

@@ -97,14 +97,14 @@ resolve_runtime(cfg) -> (node_path, dsh_dir):
 
 ## 6. 跨平台矩阵(构建期)
 
-| 阶段 | macOS(arm64) | macOS(x64) | Windows | Linux |
+| 阶段 | macOS(arm64) | macOS(x64) | Windows(x64) | Linux |
 |---|---|---|---|---|
-| v1 目标 | ✅ 主线 | 可交叉构建(同 pipeline) | 预留 | 预留 |
-| Node vendor | ✅ | ✅ 同脚本 | 脚本就绪 | 脚本就绪 |
-| 进程组清理 | ✅ | ✅ | `taskkill /T` 分支 | ✅ 同 Unix |
-| dmg/app | ✅ | ✅ | 待适配 | 待适配(deb/AppImage) |
+| v1 目标 | ✅ 主线 | 可交叉构建(同 pipeline) | ✅ 已适配 | 预留 |
+| Node vendor | ✅ | ✅ 同脚本 | ✅(`win-x64`→`win32-x64`) | 脚本就绪 |
+| 进程组清理 | ✅ | ✅ | `taskkill /T /F` | ✅ 同 Unix |
+| 安装包 | ✅ dmg | ✅ dmg | ✅ NSIS | 待适配(deb/AppImage) |
 
-> v1 只出 darwin-arm64 与 darwin-x64;其余平台代码与脚本先行,验证留到 M3.5 之后。
+> v1 产出 darwin-arm64 / darwin-x64 / win32-x64;Linux 仅脚本与 cfg 预留。Windows vendor:官方包名 `win-x64`,落地目录 `win32-x64`(与 `runtime.platform_dir()` 一致)。
 
 ## 7. tauri.conf 相关配置
 

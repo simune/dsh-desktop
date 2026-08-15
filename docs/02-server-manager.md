@@ -127,7 +127,7 @@ fn health_check(url, deadline) -> bool:
 fn stop():
   user_intent = true(先置位,防止回调触发重启)
   若 child 已退出: 直接 Stopped,return
-  child.kill()                    # Unix: SIGTERM;Windows: 见下
+  # Unix: Child::kill()=SIGKILL → 宽限 5s → kill(-pid); Windows: 直接 taskkill /T /F
   deadline = now + 5s
   loop:
     if child.try_wait().is_some(): → Stopped, return
@@ -137,9 +137,9 @@ fn stop():
   wait 500ms → Stopped
 ```
 
-- **进程组清理(macOS/Linux)**:spawn 时 `process_group(0)` 使子进程成为新进程组组长;兜底时 `kill(-child_pid, SIGKILL)` 整组击杀。防 bash 工具派生的孙进程成孤儿。
-- **Windows**:spawn 时 `CREATE_NEW_PROCESS_GROUP`;优雅期用 `GenerateConsoleCtrlEvent(CTRL_BREAK)`(尽力);兜底 `taskkill /T /F /PID <pid>`(递归杀树)。
-- 平台差异收敛到两个函数:`spawn_with_group(cmd) -> Child` 与 `kill_group(child)`,用 `#[cfg(target_os=...)]` 隔离,其余代码平台无关(M3.5 的跨平台预留点)。
+- **进程组清理(macOS/Linux)**:spawn 时 `process_group(0)` 使子进程成为新进程组组长;兜底时 `kill(-child_pid, SIGKILL)` 整组击杀。防 bash 工具派生的孙进程成孤儿。注意 `std::process::Child::kill()` 在 Unix 上是 **SIGKILL**(非 SIGTERM)。
+- **Windows**:spawn 时 `CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW`(server.rs)。node.exe 是控制台程序,`taskkill` 不带 `/F` 无效,故**直接** `taskkill /T /F /PID <pid>` 递归杀树(不先 TerminateProcess 主进程,否则孙进程成孤儿)。`taskkill` 自身也带 `CREATE_NO_WINDOW` 避免闪控制台。
+- 平台差异集中在 `spawn_dsh` / `graceful_stop` / `kill_process_group`(及 Windows 辅助 `taskkill_tree`),用 `#[cfg(...)]` 隔离。
 
 ## 6. 崩溃重启策略
 
