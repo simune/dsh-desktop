@@ -22,6 +22,15 @@
 - **验证**:新增测试钩子 `DSH_DESKTOP_CLOSE_MS`;dev 与发布版(挂载 dmg 运行)均实测:close → stopped → 进程归零、零残留
 - **踩坑**:`npx tauri build --bundles dmg` 会清掉独立 .app;测试须挂载最新 dmg,注意旧挂载残留会测到旧包
 
+### 缺陷修复:启动加载页四周白边(2026-08-15)
+
+- **症状**:启动时加载页(进度条)四周有白边
+- **根因**:`html/body` 未重置默认 margin(8px),深色容器四周露出白色页面背景;WebView 加载/导航瞬间窗口背景也为白
+- **修复**:
+  - `App.css` 全局重置:`html, body, #root { margin:0; padding:0; height:100%; background:#0d1117 }`
+  - 主窗口与设置窗口 `.background_color(Color(13,17,23,255))`,消除加载/导航白闪
+- **验证**:运行中窗口 8 个边缘采样点全部深色(0/8 白)
+
 ### 子模块化转换(2026-08-15)
 
 - `plugins/dsh-usage-stats` 由"裸 gitlink"升级为**正式 submodule**:

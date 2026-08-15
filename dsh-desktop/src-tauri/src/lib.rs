@@ -76,6 +76,7 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     )
     .title("DSH Desktop 设置")
     .inner_size(540.0, 680.0)
+    .background_color(tauri::window::Color(13, 17, 23, 255))
     .on_navigation(move |url| window::is_local_shell(url))
     .build()
     .map_err(|e| e.to_string())?;
@@ -211,6 +212,7 @@ pub fn run() {
             )
             .title("DSH Desktop")
             .inner_size(1280.0, 800.0)
+            .background_color(tauri::window::Color(13, 17, 23, 255))
             .on_navigation(move |url| window::navigation_guard(&app_handle, url))
             .build()?;
             Ok(())
