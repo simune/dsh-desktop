@@ -348,24 +348,54 @@ fn spawn_dsh(
             log(logs, log_lines, &format!("[app] port policy: fixed {port}"));
         }
     }
-    let cwd = settings
-        .cwd
-        .clone()
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
-        .unwrap_or_else(|| PathBuf::from("/"));
-    cmd.current_dir(&cwd);
+    cmd.current_dir(&settings.cwd.clone().map(PathBuf::from).unwrap_or_else(user_home));
     if let Some(home) = &settings.dsh_home {
         cmd.env("DSH_HOME", home);
     }
     cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(unix)]
     {
+        // 子进程成为新进程组组长,兜底时 kill(-pid) 整组清理(防孙进程孤儿)
         use std::os::unix::process::CommandExt;
         cmd.process_group(0);
     }
+    #[cfg(windows)]
+    {
+        // CREATE_NEW_PROCESS_GROUP(0x200):与 taskkill /T 配合按树清理;
+        // CREATE_NO_WINDOW(0x08000000):node.exe 是控制台程序,避免从 GUI 进程
+        // spawn 时弹出黑色控制台窗口。参见 docs/02 §6 跨平台进程组策略。
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW);
+    }
     cmd.spawn().map_err(|e| e.to_string())
 }
+
+/// 用户主目录:macOS/Linux 用 HOME;Windows 用 USERPROFILE(回退 HOMEDRIVE+HOMEPATH)。
+/// 作为子进程默认 cwd(与 dsh 自身行为一致;设置项 cwd 优先)。
+fn user_home() -> PathBuf {
+    #[cfg(windows)]
+    {
+        std::env::var_os("USERPROFILE")
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOMEDRIVE")
+                    .zip(std::env::var_os("HOMEPATH"))
+                    .map(|(d, p)| PathBuf::from(d).join(p))
+            })
+            .unwrap_or_else(|| PathBuf::from("C:\\"))
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("/"))
+    }
+}
+
+#[cfg(windows)]
+const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn wait_ready(
     child: &mut Child,
@@ -486,18 +516,34 @@ fn http_get_ok(port: u16) -> bool {
 // ---------- 停止与清理 ----------
 
 fn graceful_stop(child: &mut Child, logs: &Arc<Mutex<VecDeque<String>>>, log_lines: usize) {
-    log(
-        logs,
-        log_lines,
-        "[app] SIGTERM → 宽限 5s → 兜底进程组 SIGKILL",
-    );
-    let _ = child.kill(); // unix: SIGTERM;windows: TerminateProcess
-    let deadline = Instant::now() + GRACE_PERIOD;
-    while Instant::now() < deadline {
-        if let Ok(Some(_)) = child.try_wait() {
-            return;
+    #[cfg(unix)]
+    {
+        // std Child::kill() 在 unix 是 SIGKILL(立即终止主进程);
+        // 孙进程由下方 kill_process_group 兜底(宽限后整组清理)
+        log(logs, log_lines, "[app] SIGKILL → 宽限 5s → 兜底进程组 SIGKILL");
+        let _ = child.kill();
+        let deadline = Instant::now() + GRACE_PERIOD;
+        while Instant::now() < deadline {
+            if let Ok(Some(_)) = child.try_wait() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
         }
-        std::thread::sleep(Duration::from_millis(100));
+    }
+    #[cfg(windows)]
+    {
+        // Windows:node.exe 是控制台程序,taskkill 不带 /F 对它无效
+        // ("can only be terminated forcefully"),直接 /T /F 递归杀树;
+        // 不先 TerminateProcess 主进程——否则孙进程会成孤儿(docs/02 §6)。
+        log(logs, log_lines, "[app] taskkill /T /F → 等待退出(宽限 5s)");
+        taskkill_tree(child.id());
+        let deadline = Instant::now() + GRACE_PERIOD;
+        while Instant::now() < deadline {
+            if let Ok(Some(_)) = child.try_wait() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
     }
     kill_process_group(child);
     let _ = child.wait();
@@ -521,11 +567,18 @@ fn kill_process_group(child: &Child) {
     }
     #[cfg(windows)]
     {
-        let pid = child.id();
-        let _ = Command::new("taskkill")
-            .args(["/T", "/F", "/PID", &pid.to_string()])
-            .status();
+        taskkill_tree(child.id());
     }
+}
+
+/// Windows: taskkill /T /F 递归杀树;CREATE_NO_WINDOW 避免从 GUI 调起时闪控制台。
+#[cfg(windows)]
+fn taskkill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill")
+        .args(["/T", "/F", "/PID", &pid.to_string()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
 }
 
 // ---------- 工具 ----------

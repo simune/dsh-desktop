@@ -52,13 +52,49 @@ pub fn resolve_runtime(
     let node = find_executable("node").ok_or("未在 PATH 找到 node")?;
     let dsh = find_executable("dsh")
         .ok_or("未在 PATH 找到 dsh;请先 npm i -g @deepseek-ai/dsh 或配置 bundled 运行时")?;
-    // dsh 可能是符号链接(homebrew),解析到真实 bin.js
-    let dsh = std::fs::canonicalize(&dsh).unwrap_or(dsh);
+    let dsh = resolve_dsh_bin(&dsh)?;
     Ok(Runtime {
         node,
         dsh_bin: dsh,
         source: "path",
     })
+}
+
+/// dsh 可执行文件 → 真实 lib/bin.js(spawn 时用 `node <bin.js> web`)。
+/// - unix: npm 全局 bin 是带 shebang 的 JS(homebrew 场景为符号链接),canonicalize 解析;
+/// - windows: npm 生成 dsh.cmd / dsh / dsh.ps1 shim(均非 JS),node 无法直接执行,
+///   需解析到同前缀 node_modules/@deepseek-ai/dsh/lib/bin.js。
+fn resolve_dsh_bin(p: &Path) -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        if p.extension().map(|e| e == "js").unwrap_or(false) {
+            return Ok(std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()));
+        }
+        if let Some(dir) = p.parent() {
+            let bin = dir
+                .join("node_modules")
+                .join("@deepseek-ai")
+                .join("dsh")
+                .join("lib")
+                .join("bin.js");
+            if bin.is_file() {
+                return Ok(bin);
+            }
+            return Err(format!(
+                "找到 dsh shim({}) 但未能解析到 lib/bin.js(期望 {})",
+                p.display(),
+                bin.display()
+            ));
+        }
+        Err(format!(
+            "找到 dsh shim({}) 但无法解析父目录以定位 lib/bin.js",
+            p.display()
+        ))
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()))
+    }
 }
 
 fn platform_dir() -> &'static str {
@@ -69,7 +105,11 @@ fn platform_dir() -> &'static str {
             "darwin-x64"
         }
     } else if cfg!(target_os = "windows") {
-        "win32-x64"
+        if cfg!(target_arch = "aarch64") {
+            "win32-arm64"
+        } else {
+            "win32-x64"
+        }
     } else {
         "linux-x64"
     }
@@ -86,20 +126,27 @@ fn node_exe() -> &'static str {
 fn find_executable(name: &str) -> Option<PathBuf> {
     let path_var = std::env::var_os("PATH")?;
     for dir in std::env::split_paths(&path_var) {
-        let p = dir.join(name);
-        if p.is_file() {
-            #[cfg(unix)]
-            {
+        #[cfg(windows)]
+        {
+            // Windows 需要 PATHEXT 语义:可执行文件带扩展名(node.exe / dsh.cmd),
+            // 无扩展名的裸文件名 is_file() 恒为 false
+            for ext in ["", ".exe", ".cmd", ".bat"] {
+                let p = dir.join(format!("{name}{ext}"));
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let p = dir.join(name);
+            if p.is_file() {
                 use std::os::unix::fs::PermissionsExt;
                 if let Ok(md) = p.metadata() {
                     if md.permissions().mode() & 0o111 != 0 {
                         return Some(p);
                     }
                 }
-            }
-            #[cfg(not(unix))]
-            {
-                return Some(p);
             }
         }
     }

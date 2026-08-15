@@ -107,6 +107,8 @@ fn request_exit(app: &AppHandle) {
 }
 
 /// macOS 原生菜单:应用菜单 + 退出(Cmd+Q)。退出走完整停服流程。
+/// Windows/Linux 不设应用菜单(托盘承担退出入口;Windows 窗口菜单不符合惯例)。
+#[cfg(target_os = "macos")]
 fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 
@@ -151,6 +153,7 @@ pub fn run() {
             ));
             app.manage(manager.clone());
             let _ = manager.start();
+            #[cfg(target_os = "macos")]
             let _ = setup_menu(app);
             let _ = tray::setup(app);
 
