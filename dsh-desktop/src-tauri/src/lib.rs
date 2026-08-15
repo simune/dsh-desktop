@@ -1,6 +1,7 @@
 mod runtime;
 mod server;
 mod settings;
+mod tray;
 mod window;
 
 use server::ServerManager;
@@ -28,6 +29,22 @@ fn quit_app(app: AppHandle) {
     request_exit(&app);
 }
 
+/// 将 server-status 事件负载转成托盘状态文本
+fn status_text(payload: &str) -> String {
+    let v: serde_json::Value = serde_json::from_str(payload).unwrap_or_default();
+    let state = v["state"].as_str().unwrap_or("unknown");
+    match state {
+        "running" => {
+            let url = v["url"].as_str().unwrap_or("");
+            let port = url.rsplit(':').next().unwrap_or("");
+            format!("DSH ● :{port}")
+        }
+        "starting" => "DSH … 启动中".into(),
+        "error" => "DSH ✗ 服务错误".into(),
+        _ => "DSH ○ 已停止".into(),
+    }
+}
+
 fn request_exit(app: &AppHandle) {
     if let Some(m) = app.try_state::<Arc<ServerManager>>() {
         m.stop();
@@ -49,11 +66,6 @@ fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
     app.set_menu(menu)?;
-    app.on_menu_event(|app, event| {
-        if event.id() == "quit" {
-            request_exit(app);
-        }
-    });
     Ok(())
 }
 
@@ -82,6 +94,17 @@ pub fn run() {
             app.manage(manager.clone());
             let _ = manager.start();
             let _ = setup_menu(app);
+            let _ = tray::setup(app);
+
+            // 托盘状态联动
+            {
+                use tauri::Listener;
+                let app_handle = app.handle().clone();
+                app_handle.listen("server-status", move |event| {
+                    let text = status_text(event.payload());
+                    tray::update_status(&text);
+                });
+            }
 
             // 测试钩子:DSH_DESKTOP_AUTOQUIT_MS=<ms> 时,启动 ms 毫秒后走完整退出流程
             // (验证 F3:退出后零残留;也作为 CI/验收回归工具)
@@ -107,6 +130,16 @@ pub fn run() {
             .on_navigation(move |url| window::navigation_guard(&app_handle, url))
             .build()?;
             Ok(())
+        })
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "quit" => request_exit(app),
+            "tray-open" => tray::show_main(app),
+            "tray-restart" => {
+                if let Some(m) = app.try_state::<Arc<ServerManager>>() {
+                    let _ = m.restart();
+                }
+            }
+            _ => {}
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

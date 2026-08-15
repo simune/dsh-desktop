@@ -11,7 +11,7 @@ pub struct Runtime {
 }
 
 pub fn resolve_runtime(
-    settings: &AppSettings,
+    _settings: &AppSettings,
     resource_dir: &Path,
 ) -> Result<Runtime, String> {
     // 0. 环境变量显式覆盖(调试/测试/用户配置,对应 docs/03 §5 探测链)
