@@ -16,6 +16,18 @@
 
 > 桌面客户端工程（`dsh-desktop/`）自计划 M0 起在本工作区根目录创建，与 `plugins/` 插件工作区相互独立。
 
+## 🔗 克隆与子模块
+
+`plugins/dsh-usage-stats` 是独立 git 仓库,以 **submodule** 形式关联(见 `.gitmodules`)。克隆时同步拉取:
+
+```sh
+git clone --recurse-submodules <harness仓库地址>
+# 或克隆后再执行:
+git submodule update --init
+```
+
+> 子模块 URL 为 `git@github.com:simune/dsh-usage-stats.git`(SSH)。更新子模块:`git submodule update --remote plugins/dsh-usage-stats`(可选,平时跟随其自身仓库演进即可)。
+
 ## 📁 目录结构
 
 ```

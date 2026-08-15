@@ -22,6 +22,15 @@
 - **验证**:新增测试钩子 `DSH_DESKTOP_CLOSE_MS`;dev 与发布版(挂载 dmg 运行)均实测:close → stopped → 进程归零、零残留
 - **踩坑**:`npx tauri build --bundles dmg` 会清掉独立 .app;测试须挂载最新 dmg,注意旧挂载残留会测到旧包
 
+### 子模块化转换(2026-08-15)
+
+- `plugins/dsh-usage-stats` 由"裸 gitlink"升级为**正式 submodule**:
+  - 新增 `.gitmodules`(path + url = git@github.com:simune/dsh-usage-stats.git)
+  - `git submodule absorbgitdirs` 收编插件 gitdir 至 `.git/modules/plugins/dsh-usage-stats`
+  - 插件自身 remote/历史/工作区不受影响,仍可独立推送
+- 克隆方式:`git clone --recurse-submodules <url>` 或 `git submodule update --init`
+- 本地全流程验证:file 协议克隆 `--recurse-submodules` → 子仓自动检出 d6463cb、内容完整
+
 ### 远程推送状态(2026-08-15)
 
 - 本地仓库:16 个提交、工作区干净;远程 `origin = git@github.com:simune/dsh-desktop.git`(私有,已存在)
