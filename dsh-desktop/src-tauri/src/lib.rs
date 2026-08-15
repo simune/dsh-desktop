@@ -147,6 +147,9 @@ pub fn run() {
             let settings = Arc::new(Mutex::new(AppSettings::load(&settings_path)));
             app.manage(settings.clone());
             let resource_dir = app.path().resource_dir().unwrap_or_default();
+            // Windows 上 current_exe() 可能返回 \\?\ 长路径前缀,node 无法处理 argv 中的该前缀
+            // (会把路径误解析为裸盘符导致 EISDIR),用 dunce 归一化为普通路径。
+            let resource_dir = dunce::simplified(&resource_dir).to_path_buf();
             let manager = Arc::new(ServerManager::new(
                 app.handle().clone(),
                 settings,

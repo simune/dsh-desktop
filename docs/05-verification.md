@@ -113,6 +113,8 @@ npm run vendor        # 生成 resources/node/win32-x64/node.exe + resources/dsh
 npm run build:app     # 前端构建 + tauri build → target/release/bundle/nsis/*.exe
 ```
 
+> 打包格式：MSI 与 NSIS 功能等价,只打一种即可。Windows 默认只产 **NSIS**(`src-tauri/tauri.windows.conf.json` 固定 `targets: ["nsis"]`)——实测 NSIS ≈ 4 分钟 / 52 MB,MSI(WiX light)≈ 17 分钟 / 103 MB。如需 MSI:`npm run build:app:msi`(详见 `dsh-desktop/README.md`)。
+
 ### 4.5.3 验收清单
 
 | # | 步骤 | 预期 |
