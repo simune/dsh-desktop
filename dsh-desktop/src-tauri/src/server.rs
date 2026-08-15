@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpStream};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -164,6 +164,14 @@ fn server_loop(
             }
         };
         log(&logs, log_lines, &format!("[app] runtime: {}", rt.source));
+
+        // 1.1 确保 web profile 的 bundles 包含捆绑插件(安装树可解析时)
+        if let Some(dsh_home) = resolve_dsh_home(&settings) {
+            let dsh_pkg_dir = rt.dsh_bin.parent().and_then(|p| p.parent()); // <dsh>/lib/bin.js -> <dsh>
+            if let Some(pkg) = dsh_pkg_dir {
+                ensure_usage_stats_bundle(&dsh_home, pkg, &logs, log_lines);
+            }
+        }
 
         set_state(&state, ServerState::Starting);
         emit_status(&app, &state);
@@ -621,4 +629,132 @@ fn emit_status(app: &AppHandle, state: &Arc<Mutex<ServerState>>) {
     let s = state.lock().unwrap().clone();
     println!("[app] status -> {}", serde_json::to_string(&s).unwrap_or_default());
     let _ = app.emit("server-status", s);
+}
+
+// ---------- 捆绑插件:web profile bundles 确保 ----------
+
+const PROFILE_PATCH_TEMPLATE: &str = "# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+[]
+";
+
+const PROFILE_PNPM_WORKSPACE: &str = "packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: false
+";
+
+/// 解析客户端实际使用的 DSH_HOME(设置 > 环境变量 > 默认 ~/.dsh)
+fn resolve_dsh_home(settings: &AppSettings) -> Option<PathBuf> {
+    if let Some(h) = &settings.dsh_home {
+        return Some(PathBuf::from(h));
+    }
+    if let Some(h) = std::env::var_os("DSH_HOME") {
+        return Some(PathBuf::from(h));
+    }
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".dsh"))
+}
+
+/// 从安装锚点(按 Node node_modules 向上查找)解析包目录
+fn resolve_from(anchor_pkg_dir: &Path, name: &str) -> Option<PathBuf> {
+    let mut dir = Some(anchor_pkg_dir);
+    while let Some(d) = dir {
+        let cand = d.join("node_modules").join(name);
+        if cand.join("package.json").is_file() {
+            return Some(cand);
+        }
+        dir = d.parent();
+    }
+    None
+}
+
+/// 确保 web profile 的 bundles 含捆绑插件(可解析时),并按 dsh 模板预创建 profile。
+/// 幂等;不触碰用户已有配置(仅追加缺失 bundle)。
+fn ensure_usage_stats_bundle(
+    dsh_home: &Path,
+    dsh_pkg_dir: &Path,
+    logs: &Arc<Mutex<VecDeque<String>>>,
+    log_lines: usize,
+) {
+    const BUNDLE: &str = "dsh-usage-stats";
+    let Some(plugin_dir) = resolve_from(dsh_pkg_dir, BUNDLE) else {
+        return; // 本安装树没有该插件(如未 vendor),不向 profile 追加
+    };
+    let profile_dir = dsh_home.join("profiles").join("web");
+    let manifest_path = profile_dir.join("package.json");
+
+    // 读取或按 dsh initProfile 模板创建
+    let mut manifest: serde_json::Value = match std::fs::read_to_string(&manifest_path) {
+        Ok(s) => serde_json::from_str(&s).unwrap_or_else(|_| default_profile_manifest()),
+        Err(_) => default_profile_manifest(),
+    };
+
+    // 确保 bundles 数组包含 BUNDLE
+    let bundles = manifest
+        .pointer_mut("/dsh/profile/bundles")
+        .and_then(|v| v.as_array_mut());
+    let mut changed = false;
+    match bundles {
+        Some(arr) => {
+            if !arr.iter().any(|b| b.as_str() == Some(BUNDLE)) {
+                arr.push(serde_json::Value::String(BUNDLE.into()));
+                changed = true;
+            }
+        }
+        None => {
+            manifest["dsh"]["profile"]["bundles"] =
+                serde_json::json!(["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", BUNDLE]);
+            changed = true;
+        }
+    }
+
+    if changed {
+        if let Some(dir) = manifest_path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let text = serde_json::to_string_pretty(&manifest).unwrap_or_default() + "\n";
+        if std::fs::write(&manifest_path, text).is_ok() {
+            log(logs, log_lines, &format!("[app] profile bundles 已确保包含 {BUNDLE}"));
+        }
+    }
+
+    // 补齐 dsh 初始化所需的其余文件(不存在时)
+    if !profile_dir.join("cordis.patch.yml").exists() {
+        let _ = std::fs::write(profile_dir.join("cordis.patch.yml"), PROFILE_PATCH_TEMPLATE);
+    }
+    if !profile_dir.join("pnpm-workspace.yaml").exists() {
+        let _ = std::fs::write(profile_dir.join("pnpm-workspace.yaml"), PROFILE_PNPM_WORKSPACE);
+    }
+
+    // 补 profile 内 node_modules 链接:插件 patch 会按名 import,须从 profile 可解析
+    let nm_dir = profile_dir.join("node_modules");
+    let link = nm_dir.join(BUNDLE);
+    if !link.exists() {
+        let _ = std::fs::create_dir_all(&nm_dir);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            if symlink(&plugin_dir, &link).is_ok() {
+                log(logs, log_lines, &format!("[app] profile node_modules 已链接 {BUNDLE}"));
+            }
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::symlink_dir;
+            if symlink_dir(&plugin_dir, &link).is_ok() {
+                log(logs, log_lines, &format!("[app] profile node_modules 已链接 {BUNDLE}"));
+            }
+        }
+    }
+}
+
+fn default_profile_manifest() -> serde_json::Value {
+    serde_json::json!({
+        "name": "dsh-profile-web",
+        "private": true,
+        "dependencies": {},
+        "dsh": { "profile": { "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app"] } }
+    })
 }

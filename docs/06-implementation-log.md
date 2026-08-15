@@ -22,6 +22,16 @@
 - **验证**:新增测试钩子 `DSH_DESKTOP_CLOSE_MS`;dev 与发布版(挂载 dmg 运行)均实测:close → stopped → 进程归零、零残留
 - **踩坑**:`npx tauri build --bundles dmg` 会清掉独立 .app;测试须挂载最新 dmg,注意旧挂载残留会测到旧包
 
+### 安装包捆绑 dsh-usage-stats 插件(2026-08-15)
+
+- **目标**:全新机器安装后,web profile 自动带 dsh-usage-stats,无需手动 `dsh plugin add`
+- **实现**:
+  1. `vendor-dsh.mjs`:`npm pack` 插件(默认从本工作区 `../../plugins/dsh-usage-stats`)→ `npm install` 进捆绑安装树 `resources/dsh/node_modules/dsh-usage-stats`(离线可解析)
+  2. `server.rs ensure_usage_stats_bundle`:启动前确保 web profile 的 `dsh.profile.bundles` 含插件(按 dsh initProfile 模板预创建缺失 profile),并补 `profiles/web/node_modules/dsh-usage-stats` 符号链接 → 捆绑插件目录(patch 内 `import 'dsh-usage-stats'` 从 profile 解析)
+  3. 仅当插件可从安装树解析时才注入(未 vendor 时跳过,不破坏 dev/PATH 模式)
+- **验证**(全新 DSH_HOME=/tmp/fresh-dsh):profile 自动创建、bundles 含插件、链接建立、dsh 启动 running 无解析错误
+- **环境坑(重要)**:`com.apple.provenance` xattr —— 受限上下文拷贝的可执行文件会被 arm64 macOS 以 SIGKILL 击杀(exit 137),`xattr -d` 无法清除;解决:用 `cp` 重新生成干净副本。另:构建 target 目录改由 `CARGO_TARGET_DIR` 环境变量指定(见 .cargo/config.toml 注释,跨平台友好)
+
 ### 缺陷修复:启动加载页四周白边(2026-08-15)
 
 - **症状**:启动时加载页(进度条)四周有白边
