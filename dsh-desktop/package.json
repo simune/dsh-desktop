@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "dev:app": "tauri dev",
     "build:app": "npm run vendor && npm run build && tauri build",
-    "clean:apple-double": "find . -name '._*' -not -path './node_modules/*' -delete",
+    "clean:apple-double": "node scripts/clean-apple-double.mjs",
     "vendor": "node scripts/vendor-node.mjs && node scripts/vendor-dsh.mjs"
   },
   "dependencies": {
@@ -27,5 +27,8 @@
     "vite": "^7.0.4",
     "@tauri-apps/cli": "^2"
   },
-  "description": "DSH × Tauri 桌面客户端(DeepSeek Harness)"
+  "description": "DSH × Tauri 桌面客户端(DeepSeek Harness)",
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
 }

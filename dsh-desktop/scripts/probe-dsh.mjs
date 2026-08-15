@@ -14,12 +14,29 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import readline from 'node:readline';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DSH_DEFAULT = '/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/lib/bin.js';
 const URL_RE = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)/;
 const START_TIMEOUT_MS = 60_000;
+
+/** 默认 dsh bin.js:macOS homebrew 路径;Windows 探测 npm 全局布局 */
+function defaultDshBin() {
+  if (process.platform === 'win32') {
+    const roots = [];
+    if (process.env.APPDATA) roots.push(path.join(process.env.APPDATA, 'npm'));
+    if (process.env.ProgramFiles) roots.push(path.join(process.env.ProgramFiles, 'nodejs'));
+    if (process.env.LOCALAPPDATA) roots.push(path.join(process.env.LOCALAPPDATA, 'fnm_multishells', 'current')); // fnm 场景尽力而为
+    if (roots.length === 0) return '';
+    for (const r of roots) {
+      const bin = path.join(r, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
+      if (existsSync(bin)) return bin;
+    }
+    return path.join(roots[0] ?? '', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js');
+  }
+  return '/opt/homebrew/lib/node_modules/@deepseek-ai/dsh/lib/bin.js';
+}
 
 function parseUrl(line) {
   const m = URL_RE.exec(line);
@@ -43,7 +60,7 @@ async function main() {
     cmdArgs = [path.join(__dirname, 'fake-dsh.mjs'), ...args.slice(1)];
   } else {
     const binIdx = args.indexOf('--bin');
-    const bin = binIdx !== -1 ? args[binIdx + 1] : DSH_DEFAULT;
+    const bin = binIdx !== -1 ? args[binIdx + 1] : defaultDshBin();
     cmd = process.execPath;
     cmdArgs = [bin, 'web', '--port', '0'];
   }
@@ -79,11 +96,23 @@ async function main() {
     exitCode = 1;
   }
 
-  // 清理:SIGTERM → 2s 宽限 → SIGKILL
+  // 清理:Windows 用 taskkill /T /F(与主 app 一致);其它平台 SIGTERM → 2s → SIGKILL
   if (child.exitCode === null && child.signalCode === null) {
-    child.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 2000));
-    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    if (process.platform === 'win32' && child.pid) {
+      try {
+        spawn('taskkill', ['/T', '/F', '/PID', String(child.pid)], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+      } catch {
+        child.kill();
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+    } else {
+      child.kill('SIGTERM');
+      await new Promise((r) => setTimeout(r, 2000));
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    }
   }
   process.exit(exitCode);
 }
