@@ -62,23 +62,24 @@ pub struct ServerManager {
     stop_tx: Mutex<Option<Sender<LoopMsg>>>,
     handle: Mutex<Option<JoinHandle<()>>>,
     app: AppHandle,
-    settings: Arc<AppSettings>,
+    settings: Arc<Mutex<AppSettings>>,
     resource_dir: PathBuf,
     /// 本地壳页面 URL(错误页回跳用)
     shell_url: String,
 }
 
 impl ServerManager {
-    pub fn new(app: AppHandle, settings: Arc<AppSettings>, resource_dir: PathBuf) -> Self {
+    pub fn new(app: AppHandle, settings: Arc<Mutex<AppSettings>>, resource_dir: PathBuf) -> Self {
         let shell_url = if cfg!(debug_assertions) {
             "http://localhost:1420".to_string()
         } else {
             "tauri://localhost".to_string()
         };
+        let log_lines = settings.lock().unwrap().log_lines.max(100);
         Self {
             state: Arc::new(Mutex::new(ServerState::Stopped)),
             logs: Arc::new(Mutex::new(VecDeque::new())),
-            log_lines: settings.log_lines.max(100),
+            log_lines,
             stop_tx: Mutex::new(None),
             handle: Mutex::new(None),
             app,
@@ -141,7 +142,7 @@ fn server_loop(
     state: Arc<Mutex<ServerState>>,
     logs: Arc<Mutex<VecDeque<String>>>,
     log_lines: usize,
-    settings: Arc<AppSettings>,
+    settings: Arc<Mutex<AppSettings>>,
     resource_dir: PathBuf,
     shell_url: String,
     rx: Receiver<LoopMsg>,
@@ -151,6 +152,8 @@ fn server_loop(
     let mut stopped = false;
 
     while !stopped {
+        // 每次尝试取设置快照(DSH_HOME/端口策略修改在下次重启生效)
+        let settings = settings.lock().unwrap().clone();
         // 1. 定位运行时
         let rt = match runtime::resolve_runtime(&settings, &resource_dir) {
             Ok(rt) => rt,

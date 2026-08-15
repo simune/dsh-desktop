@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import SettingsView from "./Settings";
 import "./App.css";
 
 /**
@@ -15,6 +16,11 @@ type ServerStatus =
   | { state: "error"; code: string; message: string };
 
 function App() {
+  // 设置窗口:index.html?view=settings 进入设置视图
+  if (new URLSearchParams(window.location.search).get("view") === "settings") {
+    return <SettingsView />;
+  }
+
   const [status, setStatus] = useState<ServerStatus | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);

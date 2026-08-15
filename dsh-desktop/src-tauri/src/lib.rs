@@ -6,7 +6,7 @@ mod window;
 
 use server::ServerManager;
 use settings::AppSettings;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 
 #[tauri::command]
@@ -27,6 +27,60 @@ fn restart_server(mgr: State<'_, Arc<ServerManager>>) -> Result<(), String> {
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     request_exit(&app);
+}
+
+#[tauri::command]
+fn get_settings(settings: State<'_, Arc<Mutex<AppSettings>>>) -> AppSettings {
+    settings.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn set_settings(
+    app: AppHandle,
+    settings: State<'_, Arc<Mutex<AppSettings>>>,
+    new: AppSettings,
+) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    if new.autostart {
+        let _ = app.autolaunch().enable();
+    } else {
+        let _ = app.autolaunch().disable();
+    }
+    let path = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?
+        .join("settings.json");
+    new.save(&path)?;
+    *settings.lock().unwrap() = new;
+    Ok(())
+}
+
+#[tauri::command]
+fn open_settings(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    let url = if cfg!(debug_assertions) {
+        "http://localhost:1420/?view=settings"
+    } else {
+        "tauri://localhost/?view=settings"
+    };
+    let app_handle = app.clone();
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        "settings",
+        tauri::WebviewUrl::External(url.parse::<tauri::Url>().map_err(|e| e.to_string())?),
+    )
+    .title("DSH Desktop 设置")
+    .inner_size(540.0, 680.0)
+    .on_navigation(move |url| window::is_local_shell(url))
+    .build()
+    .map_err(|e| e.to_string())?;
+    let _ = app_handle;
+    Ok(())
 }
 
 /// 将 server-status 事件负载转成托盘状态文本
@@ -73,6 +127,10 @@ fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
@@ -83,7 +141,7 @@ pub fn run() {
             let cfg_dir = app.path().app_config_dir()?;
             let settings_path = cfg_dir.join("settings.json");
             server::init_log_file(cfg_dir.join("server.log"));
-            let settings = Arc::new(AppSettings::load(&settings_path));
+            let settings = Arc::new(Mutex::new(AppSettings::load(&settings_path)));
             app.manage(settings.clone());
             let resource_dir = app.path().resource_dir().unwrap_or_default();
             let manager = Arc::new(ServerManager::new(
@@ -103,6 +161,15 @@ pub fn run() {
                 app_handle.listen("server-status", move |event| {
                     let text = status_text(event.payload());
                     tray::update_status(&text);
+                });
+            }
+
+            // 测试钩子:DSH_DESKTOP_OPEN_SETTINGS=1 时,启动 2s 后打开设置窗口
+            if std::env::var("DSH_DESKTOP_OPEN_SETTINGS").is_ok() {
+                let app = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    let _ = open_settings(app);
                 });
             }
 
@@ -153,7 +220,10 @@ pub fn run() {
             get_server_status,
             get_logs,
             restart_server,
-            quit_app
+            quit_app,
+            get_settings,
+            set_settings,
+            open_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

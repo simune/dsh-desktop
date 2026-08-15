@@ -55,3 +55,26 @@ button.secondary { background: #30363d; }
   animation: spin 0.9s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 设置页 */
+.settings {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 28px 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e6edf3;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.settings h1 { font-size: 20px; }
+.settings h2 { font-size: 15px; margin: 0 0 6px; }
+.settings label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #8b949e; }
+.settings label.row { flex-direction: row; align-items: center; color: #e6edf3; }
+.settings fieldset { border: 1px solid #30363d; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.settings input[type="text"], .settings input[type="number"] {
+  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+  color: #e6edf3; padding: 8px 10px; font-size: 13px;
+}
+.settings .logs-section { margin-top: 8px; }
+.settings .logs { max-height: 30vh; }

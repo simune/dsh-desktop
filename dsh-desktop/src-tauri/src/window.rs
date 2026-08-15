@@ -4,7 +4,19 @@ use crate::server::{ServerManager, ServerState};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, Url};
 
+/// 是否为本地壳页面(tauri://localhost / http://tauri.localhost / dev localhost:1420)
+pub fn is_local_shell(url: &Url) -> bool {
+    let host = url.host_str().unwrap_or("");
+    let scheme = url.scheme();
+    (scheme == "tauri" && host == "localhost")
+        || (scheme == "http" && host == "tauri.localhost")
+        || (scheme == "http" && host == "localhost" && url.port() == Some(1420))
+}
+
 pub fn navigation_guard(app: &AppHandle, url: &Url) -> bool {
+    if is_local_shell(url) {
+        return true;
+    }
     let host = url.host_str().unwrap_or("");
     let scheme = url.scheme();
 
