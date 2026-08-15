@@ -1,0 +1,3 @@
+[submodule "plugins/dsh-usage-stats"]
+	path = plugins/dsh-usage-stats
+	url = git@github.com:simune/dsh-usage-stats.git
