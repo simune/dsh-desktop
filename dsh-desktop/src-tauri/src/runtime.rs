@@ -14,6 +14,20 @@ pub fn resolve_runtime(
     settings: &AppSettings,
     resource_dir: &Path,
 ) -> Result<Runtime, String> {
+    // 0. 环境变量显式覆盖(调试/测试/用户配置,对应 docs/03 §5 探测链)
+    if let Ok(node) = std::env::var("DSH_DESKTOP_NODE") {
+        if let Ok(dsh) = std::env::var("DSH_DESKTOP_DSH") {
+            let node = PathBuf::from(node);
+            let dsh = PathBuf::from(dsh);
+            if node.is_file() && dsh.is_file() {
+                return Ok(Runtime {
+                    node,
+                    dsh_bin: dsh,
+                    source: "config",
+                });
+            }
+        }
+    }
     // 1. bundled(优先)
     let node = resource_dir
         .join("node")
