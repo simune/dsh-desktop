@@ -164,6 +164,20 @@ pub fn run() {
                 });
             }
 
+            // 测试钩子:DSH_DESKTOP_CLOSE_MS=<ms> 时,模拟点击主窗口关闭按钮(走 CloseRequested 路径)
+            if let Ok(ms) = std::env::var("DSH_DESKTOP_CLOSE_MS") {
+                if let Ok(ms) = ms.parse::<u64>() {
+                    let app = app.handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        if let Some(w) = app.get_webview_window("main") {
+                            println!("[test] closing main window…");
+                            let _ = w.close();
+                        }
+                    });
+                }
+            }
+
             // 测试钩子:DSH_DESKTOP_OPEN_SETTINGS=1 时,启动 2s 后打开设置窗口
             if std::env::var("DSH_DESKTOP_OPEN_SETTINGS").is_ok() {
                 let app = app.handle().clone();
@@ -209,8 +223,14 @@ pub fn run() {
             _ => {}
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                request_exit(window.app_handle());
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // 仅主窗口关闭 = 退出 app;设置窗口关闭走默认行为
+                if window.label() == "main" {
+                    api.prevent_close(); // 阻止默认关闭流程(避免 exit 被窗口事件吞掉)
+                    let app = window.app_handle().clone();
+                    // 后台线程执行停服+退出,不阻塞主线程事件循环
+                    std::thread::spawn(move || request_exit(&app));
+                }
             }
         })
         .on_page_load(|_window, payload| {

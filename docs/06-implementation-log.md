@@ -11,6 +11,17 @@
 > 1. 工具链中硬链接原子写入(link 系统调用)不可用 → write/edit 工具需改用 bash 直写;
 > 2. `tauri-build` 遍历生成目录读到 `._default.toml` 报 `stream did not contain valid UTF-8` → 通过 `dsh-desktop/.cargo/config.toml` 将 cargo target-dir 指向 APFS 卷(`~/Library/Caches/dsh-desktop/target`)解决。
 
+### 缺陷修复:点击关闭按钮无法退出(2026-08-15)
+
+- **症状**:点窗口红色关闭按钮后,服务停止但 app 进程残留(无窗口的幽灵进程)
+- **根因**:`app.exit(0)` 在 `CloseRequested` 事件处理器(主线程)内调用被窗口关闭流程吞掉,进程不退出
+- **修复**:
+  - `api.prevent_close()` 阻止默认关闭流程
+  - 后台线程执行 `request_exit`(停服 + exit),不阻塞主线程
+  - 仅主窗口关闭触发退出;设置窗口关闭走默认行为(不再误退整个 app)
+- **验证**:新增测试钩子 `DSH_DESKTOP_CLOSE_MS`;dev 与发布版(挂载 dmg 运行)均实测:close → stopped → 进程归零、零残留
+- **踩坑**:`npx tauri build --bundles dmg` 会清掉独立 .app;测试须挂载最新 dmg,注意旧挂载残留会测到旧包
+
 ### M3 发布版最终回归(2026-08-15)
 
 - 命令:`env -i PATH=/usr/bin:/bin HOME=$HOME DSH_DESKTOP_OPEN_SETTINGS=1 DSH_DESKTOP_AUTOQUIT_MS=30000 'DSH Desktop.app/Contents/MacOS/dsh-desktop'`
