@@ -12,3 +12,6 @@ src-tauri/resources/
 
 # Logs
 *.log
+
+# 本地测试日志
+.m0-logs/

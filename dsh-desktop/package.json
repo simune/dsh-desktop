@@ -1,0 +1,30 @@
+{
+  "name": "dsh-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run clean:apple-double && vite",
+    "build": "npm run clean:apple-double && tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "dev:app": "tauri dev",
+    "build:app": "npm run build && tauri build",
+    "clean:apple-double": "find . -name '._*' -not -path './node_modules/*' -delete"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4",
+    "@tauri-apps/cli": "^2"
+  },
+  "description": "DSH × Tauri 桌面客户端(DeepSeek Harness)"
+}
