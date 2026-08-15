@@ -8,7 +8,7 @@ node_modules/
 # Build artifacts（桌面客户端工程 dsh-desktop 的产物）
 dist/
 target/
-src-tauri/resources/
+**/src-tauri/resources/
 
 # Logs
 *.log

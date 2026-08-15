@@ -4,8 +4,8 @@
  * 校验 SHASUMS256;仅保留二进制本体。对应 docs/03 §3.2。
  */
 import { execFileSync } from 'node:child_process';
-import { createWriteStream, existsSync } from 'node:fs';
-import { mkdir, rm, writeFile, readFile } from 'node:fs/promises';
+import { createWriteStream, existsSync, readFileSync } from 'node:fs';
+import { mkdir, rm, writeFile, readFile, copyFile } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import https from 'node:https';
 import path from 'node:path';
@@ -77,7 +77,8 @@ async function main() {
   const destBin = path.join(destDir, bin);
   await rm(destBin, { force: true });
   await copyFile(extracted, destBin);
-  await rm(tarPath, { force: true });
+  await rm(tmp, { recursive: true, force: true }); // 清理下载与解压残留
+  await pruneAppleDouble(path.join(RES, sub));
 
   // 3. manifest
   const manifest = {
@@ -104,12 +105,18 @@ function downloadText(url) {
 }
 
 function sha256File(p) {
-  return crypto.createHash('sha256').update(readFile(p)).digest('hex');
+  return crypto.createHash('sha256').update(readFileSync(p)).digest('hex');
 }
 
-async function copyFile(src, dest) {
-  const { copyFile } = await import('node:fs/promises');
-  await copyFile(src, dest);
+/** 清理 ExFAT 卷上的 AppleDouble 侧车(避免被打进安装包) */
+async function pruneAppleDouble(dir) {
+  const { readdir, unlink, stat } = await import('node:fs/promises');
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.name.startsWith('._')) await unlink(p);
+    else if (e.isDirectory()) await pruneAppleDouble(p);
+  }
 }
 
 main().catch((e) => {

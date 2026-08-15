@@ -33,7 +33,14 @@ pub fn resolve_runtime(
         .join("node")
         .join(platform_dir())
         .join(node_exe());
-    let dsh = resource_dir.join("dsh").join("lib").join("bin.js");
+    // vendor-dsh 以 npm --prefix 安装:dsh 包位于 node_modules/@deepseek-ai/dsh
+    let dsh = resource_dir
+        .join("dsh")
+        .join("node_modules")
+        .join("@deepseek-ai")
+        .join("dsh")
+        .join("lib")
+        .join("bin.js");
     if node.is_file() && dsh.is_file() {
         return Ok(Runtime {
             node,

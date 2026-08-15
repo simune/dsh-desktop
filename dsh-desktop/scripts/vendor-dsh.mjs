@@ -33,7 +33,10 @@ async function main() {
     installedAt: new Date().toISOString(),
   };
   await writeFile(path.join(DSH_DIR, 'dsh-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
-  console.log(`[vendor-dsh] 完成: ${DSH_DIR}`);
+
+  // ExFAT 卷会为每个文件生成 ._ AppleDouble 侧车,必须清理(否则被打进安装包,体积翻倍)
+  execSync(`find "${DSH_DIR}" -name '._*' -delete`, { stdio: 'inherit' });
+  console.log(`[vendor-dsh] 完成: ${DSH_DIR} (AppleDouble 侧车已清理)`);
 }
 
 main().catch((e) => {
