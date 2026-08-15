@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "dev:app": "tauri dev",
-    "build:app": "npm run build && tauri build",
-    "clean:apple-double": "find . -name '._*' -not -path './node_modules/*' -delete"
+    "build:app": "npm run vendor && npm run build && tauri build",
+    "clean:apple-double": "find . -name '._*' -not -path './node_modules/*' -delete",
+    "vendor": "node scripts/vendor-node.mjs && node scripts/vendor-dsh.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
