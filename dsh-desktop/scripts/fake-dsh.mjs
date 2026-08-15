@@ -42,4 +42,5 @@ if (crashAfter > 0) setTimeout(() => process.exit(1), crashAfter);
 
 process.on('SIGTERM', () => process.exit(0));
 process.on('SIGINT', () => process.exit(0));
-await new Promise(() => {});
+// 保活:定时器占住事件循环(Node 22 对未决 top-level await 会在循环空时以 code 13 退出)
+setInterval(() => {}, 1 << 30);
