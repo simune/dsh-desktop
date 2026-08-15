@@ -22,6 +22,15 @@
 - **验证**:新增测试钩子 `DSH_DESKTOP_CLOSE_MS`;dev 与发布版(挂载 dmg 运行)均实测:close → stopped → 进程归零、零残留
 - **踩坑**:`npx tauri build --bundles dmg` 会清掉独立 .app;测试须挂载最新 dmg,注意旧挂载残留会测到旧包
 
+### 远程推送状态(2026-08-15)
+
+- 本地仓库:16 个提交、工作区干净;远程 `origin = git@github.com:simune/dsh-desktop.git`(私有,已存在)
+- **受阻**:本环境 SSH(22/443)均被网络拦截(198.19.0.x),keychain 无 GitHub HTTPS 凭据,无法直接推送
+- 待办(二选一):
+  1. 提供 GitHub PAT(repo 写权限),用 HTTPS 推送
+  2. 在本人终端执行 `git push -u origin main`
+- 注意:仓库含嵌入式仓库 gitlink(plugins/dsh-usage-stats),推送后 GitHub 会显示为子模块引用;如需正式 submodule 语义,执行 `git submodule add git@github.com:simune/dsh-usage-stats.git plugins/dsh-usage-stats`
+
 ### M3 发布版最终回归(2026-08-15)
 
 - 命令:`env -i PATH=/usr/bin:/bin HOME=$HOME DSH_DESKTOP_OPEN_SETTINGS=1 DSH_DESKTOP_AUTOQUIT_MS=30000 'DSH Desktop.app/Contents/MacOS/dsh-desktop'`
