@@ -11,6 +11,15 @@
 > 1. 工具链中硬链接原子写入(link 系统调用)不可用 → write/edit 工具需改用 bash 直写;
 > 2. `tauri-build` 遍历生成目录读到 `._default.toml` 报 `stream did not contain valid UTF-8` → 通过 `dsh-desktop/.cargo/config.toml` 将 cargo target-dir 指向 APFS 卷(`~/Library/Caches/dsh-desktop/target`)解决。
 
+### M3 发布版最终回归(2026-08-15)
+
+- 命令:`env -i PATH=/usr/bin:/bin HOME=$HOME DSH_DESKTOP_OPEN_SETTINGS=1 DSH_DESKTOP_AUTOQUIT_MS=30000 'DSH Desktop.app/Contents/MacOS/dsh-desktop'`
+- 结果(受限 PATH,模拟全新机器):
+  - `runtime: bundled` → dsh 启动 → `running :50480` → 主窗口 page-load dsh UI
+  - 设置窗口 page-load `tauri://localhost/?view=settings`(prod 自定义协议)
+  - 自动退出后零残留(app/子进程全清)
+- **M0-M3 全部达成,客户端可分发使用**。待人工项:开机自启需重启系统验证;托盘/设置交互点验;T5 端口冲突(设置页可用后)。M2.4 体积裁剪为优化项。
+
 ### M3 增强(2026-08-15)
 
 | 项 | 结果 |
