@@ -35,6 +35,28 @@ fn request_exit(app: &AppHandle) {
     app.exit(0);
 }
 
+/// macOS 原生菜单:应用菜单 + 退出(Cmd+Q)。退出走完整停服流程。
+fn setup_menu(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    let quit = MenuItem::with_id(app, "quit", "退出 DSH Desktop", true, Some("CmdOrCtrl+Q"))?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::separator(app)?,
+            &quit,
+        ],
+    )?;
+    app.set_menu(menu)?;
+    app.on_menu_event(|app, event| {
+        if event.id() == "quit" {
+            request_exit(app);
+        }
+    });
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -59,6 +81,19 @@ pub fn run() {
             ));
             app.manage(manager.clone());
             let _ = manager.start();
+            let _ = setup_menu(app);
+
+            // 测试钩子:DSH_DESKTOP_AUTOQUIT_MS=<ms> 时,启动 ms 毫秒后走完整退出流程
+            // (验证 F3:退出后零残留;也作为 CI/验收回归工具)
+            if let Ok(ms) = std::env::var("DSH_DESKTOP_AUTOQUIT_MS") {
+                if let Ok(ms) = ms.parse::<u64>() {
+                    let app = app.handle().clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        request_exit(&app);
+                    });
+                }
+            }
 
             // 主窗口程序化创建(以挂载导航守卫)
             let app_handle = app.handle().clone();
