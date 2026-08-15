@@ -1,0 +1,114 @@
+# 验收与验证清单
+
+> 配套 `docs/00-project-plan.md` 的每阶段出口。所有验收项要求**实测记录**(命令 + 输出),不满足即视为未完成。
+
+## 0. 环境准备
+
+| 依赖 | 说明 |
+|---|---|
+| Rust 工具链 | `rustup` + stable;`cargo --version` 可跑 |
+| Xcode Command Line Tools | `xcode-select -p` 有输出(编译 + dmg 打包) |
+| Node ≥ 20 | 本机已装(开发期探测链用);`node --version` |
+| dsh | 本机 `/opt/homebrew/lib/node_modules/@deepseek-ai/dsh`(0.1.0-rc.6) |
+
+## 1. M0 验证
+
+### 1.1 M0.1 手动验证 URL 行(直接跑 dsh)
+
+```bash
+DSH_HOME=${DSH_HOME:-$HOME/.dsh} \
+  node /opt/homebrew/lib/node_modules/@deepseek-ai/dsh/lib/bin.js web --port 0
+```
+
+预期:stdout 出现 `dsh web: http://127.0.0.1:<随机端口>`;浏览器打开该 URL 可看到 dsh UI。Ctrl+C 退出后 `pgrep -f "bin.js web"` 无残留。
+
+### 1.2 M0.2 URL 解析原型
+
+```bash
+node scripts/probe-dsh.mjs            # 期望输出:parsed url + tcp connect ok
+```
+
+用例:① 正常行;② 带 ` (LAN: ...)` 后缀的行;③ 前有噪声行。全部正确提取 `http://127.0.0.1:<port>` 并 TCP 连通。
+
+### 1.3 M0.3 Tauri 空壳加载外部 URL
+
+```bash
+cd dsh-desktop && npm run dev
+```
+
+预期:窗口显示 dsh UI(先本地跑一个 `dsh web --port 0` 供导航,或空壳直接 navigate 到该 URL)。加载成功即可,不要求生命周期。
+
+### 1.4 M0.4 WebView 冒烟
+
+在 1.3 的窗口中:发起对话,确认 SSE 流式输出逐字渲染;输入框支持方向键/中文输入/复制粘贴;刷新页面会话仍在。
+
+## 2. M1 验收(最小可用)
+
+### 2.1 功能清单
+
+| # | 步骤 | 预期 |
+|---|---|---|
+| F1 | 双击启动 app | 加载页 → 自动出现 dsh UI,无需手动跑 dsh |
+| F2 | 窗口标题/大小合理;无地址栏 | 是 |
+| F3 | 关闭窗口(或 Cmd+Q) | app 退出,`pgrep -f "bin.js web"` 为空 |
+| F4 | 启动后 `lsof -iTCP -sTCP:LISTEN -n -P \| grep node` | 只有一个 node 监听 127.0.0.1 随机端口 |
+| F5 | 日志页可见启动过程行(`[app] runtime: bundled/PATH`、`[out] dsh web: ...`) | 是 |
+
+### 2.2 故障注入
+
+| # | 场景 | 操作 | 预期 |
+|---|---|---|---|
+| T1 | 崩溃重启 | 启动后 `pkill -9 -f "bin.js web"` | 自动重启,UI 短暂回加载页后恢复;服务可再用 |
+| T2 | 崩溃上限 | 连续 `pkill -9` 5 次 | 第 5 次后停在错误页(显示退出历史),点"重试"恢复 |
+| T3 | 启动超时 | 临时把 DSH_HOME 指向不可写目录(或注入假 dsh) | 60s 内进错误页 `E_START_TIMEOUT/E_CHILD_EXITED`,显示 stderr |
+| T4 | 双开 | 再启动一个实例 | 第二个实例不出现新窗口/新服务,聚焦已有窗口 |
+| T5 | 端口占用(fixed 策略) | 设置固定端口 3080 并先占用 | 明确错误页,不挂死 |
+| T6 | 退出残留 | 正常退出后检查 | `pgrep -f "bin.js web"`、`pgrep -f dsh-desktop` 均空 |
+
+### 2.3 回归基线(每次改动后跑)
+
+```bash
+pgrep -f "bin.js web" | wc -l   # 退出后应为 0
+```
+
+## 3. M2 验收(打包分发)
+
+| # | 步骤 | 预期 |
+|---|---|---|
+| P1 | `npm run vendor` | `resources/dsh/`、`resources/node/<arch>/node`、`runtime-manifest.json` 生成 |
+| P2 | 体积记录 | `du -sh resources/* target/release/bundle/dmg/*.dmg`,对照 `docs/03` §4 预算表并回写实测 |
+| P3 | 干净环境 | 新建系统用户(或临时改 PATH 为 `/usr/bin:/bin`)从 Finder 启动 app | 正常显示 dsh UI,证明 bundled 生效 |
+| P4 | 无 node 依赖 | 干净环境 `which node` 无结果时 app 仍可启动 | 通过(依赖 bundled 优先) |
+| P5 | 覆盖安装 | 用新版 dmg 覆盖安装后启动 | 首次启动正常(`profiles/node_modules` 符号链接自愈) |
+| P6 | 开发态降级 | 删除 `resources/` 后 `npm run dev` | 启动成功,日志 `[app] runtime: PATH` |
+
+## 4. M3 验收(增强)
+
+| # | 功能 | 验收 |
+|---|---|---|
+| S1 | 托盘 | 状态随服务变化(运行中显示端口);"打开主界面/重启服务/退出"三动作正确 |
+| S2 | 设置-路径 | 改 DSH_HOME 为另一目录 → 重启服务 → 该目录 profile 生效;日志可见 |
+| S3 | 设置-端口 | 自动 ↔ 固定切换,重启服务后生效;固定被占用有明确报错 |
+| S4 | 设置-日志 | 环形缓冲行数生效;实时视图滚动正常 |
+| S5 | 开机自启 | 开关持久化;系统设置登录项可见;重启系统后自动启动 |
+| S6 | 升级 | 替换 app bundle 后首次启动正常(覆盖 R3) |
+| S7 | 安全回归 | 主窗口控制台 `window.__TAURI__` 为 undefined;`window.__DSH_BOOT__` 存在(dsh 自身) |
+
+## 5. 常见问题排查表
+
+| 症状 | 排查 | 处理 |
+|---|---|---|
+| 启动即错误页 `E_RUNTIME_NOT_FOUND` | 看 `[app] runtime:` 日志 | 跑 `npm run vendor` 或检查 PATH |
+| 60s 超时 | 看 stderr 尾部 | DSH_HOME 权限?端口被占?`profiles/node_modules` 符号链接异常(手动 `ls -la ~/.dsh/profiles/node_modules`) |
+| 白屏 | WebView 控制台;确认导航端口与 server 端口一致 | 检查 `is_remote_dsh_url` 端口比对逻辑 |
+| 退出有残留进程 | `ps -axo pid,ppid,pgid,command \| grep -i node` | 查进程组清理分支;确认 spawn 时 `process_group(0)` 生效 |
+| 覆盖安装后异常 | 删除 `~/.dsh/profiles/node_modules` 再启动 | dsh 自愈重建;若仍失败则检查 bundle 路径变更 |
+| 设置不生效 | 检查 `app_config_dir()/settings.json` 内容与权限 | 确认写路径与读取路径一致(identifier 变更会换目录) |
+
+## 6. 发布前最终检查(个人分发版)
+
+- [ ] `npm run build` 全链路一次通过,产出 dmg 体积已记录
+- [ ] P3 干净环境验证通过(最关键)
+- [ ] T1/T2/T6 故障注入回归通过
+- [ ] S7 安全回归通过
+- [ ] 已知问题与取舍已回写 `docs/00-project-plan.md` 风险登记表
