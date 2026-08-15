@@ -12,7 +12,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 
-const NODE_VERSION = process.env.DSH_DESKTOP_NODE_VERSION ?? 'v22.14.0';
+const NODE_VERSION = process.env.DSH_DESKTOP_NODE_VERSION ?? 'v22.23.2';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RES = path.join(__dirname, '..', 'src-tauri', 'resources', 'node');
 
