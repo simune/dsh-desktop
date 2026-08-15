@@ -11,6 +11,26 @@
 > 1. 工具链中硬链接原子写入(link 系统调用)不可用 → write/edit 工具需改用 bash 直写;
 > 2. `tauri-build` 遍历生成目录读到 `._default.toml` 报 `stream did not contain valid UTF-8` → 通过 `dsh-desktop/.cargo/config.toml` 将 cargo target-dir 指向 APFS 卷(`~/Library/Caches/dsh-desktop/target`)解决。
 
+### M2 打包分发(2026-08-15)
+
+| 项 | 结果 |
+|---|---|
+| M2.1 vendor 脚本 | ✅ vendor-node(下载+sha256 校验+仅留二进制)+ vendor-dsh(--omit=dev);产物真实体积 356MB(node 104M + dsh 252M) |
+| M2.2 探测链 | ✅ bundled → PATH;环境覆盖 DSH_DESKTOP_NODE/DSH_DESKTOP_DSH 已实现;`runtime: bundled` 实测生效 |
+| M2.3 dmg 打包 | ✅ `DSH Desktop_0.1.0_aarch64.dmg` 101MB(LZFSE);受限 PATH(`env -i PATH=/usr/bin:/bin`)运行 bundled app → 正常启动并加载 dsh UI,退出零残留 |
+| M2.4 体积裁剪 | ⏸ 优化项:101MB dmg 已低于预算(≤250M);bundle 闭包裁剪推迟(风险高收益低,依赖 dsh 自愈) |
+
+关键修复与坑:
+
+| 问题 | 处理 |
+|---|---|
+| dsh 树 du 虚高 9G(真实 252MB) | ExFAT 卷块统计问题,打包按字节,不影响产物;vendor 脚本清理 `._` 侧车防打包膨胀 |
+| bundled Node v22.14.0 缺 `node:zlib.createZstdDecompress` | 升级 v22.23.2(与开发环境一致),dsh-session-persistence-jsonl 依赖该 API |
+| bundle.resources glob 保留前缀目录 | 改映射形式 `"resources/": ""`,资源落到 Resources 根 |
+| gitignore `src-tauri/resources/` 锚定错层 | 改 `**/src-tauri/resources/`;resources 为构建产物不入库 |
+
+> 注意:打包期间 .app 被重写,测试须等构建完全结束再启动,否则会跑到旧包。
+
 ### M1 最小可用(macOS)(2026-08-15)
 
 实现:`src-tauri/src/{server,runtime,window,settings,lib}.rs` + 壳 UI(`src/App.tsx`)。关键修复记录:
