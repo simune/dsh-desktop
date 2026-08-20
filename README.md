@@ -1,5 +1,9 @@
 # DSH 插件工作区
 
+## 关于
+DeepSeek Harness 的插件与桌面客户端工作区。包含以 Tauri + Rust 打包的 dsh-desktop（启动并捆绑 node + dsh、用 WebView 承载 SPA），以及 plugins 子模块（如 dsh-usage-stats）。适用于在 Windows 上生成 NSIS/MSI 安装包、便于将 Web 服务以原生桌面形式交付给用户。
+
+
 本目录是 DeepSeek Harness（DSH）插件的统一管理工作区。
 
 ## 📄 文档
@@ -52,7 +56,7 @@ dsh/
 
 | 插件 | 版本 | 说明 |
 | --- | --- | --- |
-| [dsh-usage-stats](./plugins/dsh-usage-stats/README.md) | 0.1.12 | DeepSeek Harness Web UI 的轻量使用统计插件：Token 总量、每日趋势、活跃热力图、模型分布及数据导出 |
+| [dsh-usage-stats](./plugins/dsh-usage-stats/README.md) | 0.1.12 | DeepSeek Harness Web UI 的轻量使用统计插件：Token 总量、每日趋势、活跃热力图、模型分布及数据导出等 |
 
 ## 🚀 常见操作
 
