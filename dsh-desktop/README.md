@@ -1,5 +1,8 @@
 # DSH Desktop（DSH × Tauri 桌面客户端）
 
+## 关于
+DeepSeek Harness 的桌面客户端（dsh-desktop），将 dsh Web 服务捆绑到原生桌面壳中：启动时自动拉起内置的 node + dsh 并用 Tauri WebView 承载 SPA，简化桌面部署与使用体验；适配 Windows 打包（NSIS/MSI），便于发布本地安装包。
+
 DeepSeek Harness 的桌面客户端：启动时自动拉起内置的 `dsh web` 服务，并用原生 WebView 窗口承载 UI（替代手动跑 `dsh web` + 浏览器标签页）。
 
 - 服务端：客户端启动时 spawn bundled 的 node + dsh（`--port 0` 动态端口），退出时按进程组清理
@@ -65,4 +68,4 @@ npm run build:app                # 前端构建 + tauri build（Windows 默认�
 [app] running: http://127.0.0.1:<port>
 ```
 
-> Windows 注意事项：Rust `current_exe()` 可能返回 `\\?\` 长路径前缀，node 无法处理该前缀（会把 argv 路径误解析为盘符导致 EISDIR）。客户端已在 `lib.rs` 用 `dunce::simplified()` 归一化 `resource_dir`，请勿回退该修复。
+> Windows 注意事项：Rust `current_exe()` 可能返回 `\\?\` 长路径前缀，node 无法处理该前缀（会把 argv 路径误解析为盘符导致 EISDIR）。客户端已在 `lib.rs` 用[...]
