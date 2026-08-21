@@ -140,7 +140,7 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
         "tauri://localhost/?view=settings"
     };
     let app_handle = app.clone();
-    tauri::WebviewWindowBuilder::new(
+    let settings_win = tauri::WebviewWindowBuilder::new(
         &app,
         "settings",
         tauri::WebviewUrl::External(url.parse::<tauri::Url>().map_err(|e| e.to_string())?),
@@ -150,8 +150,6 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     .min_inner_size(480.0, 560.0)
     .decorations(false)
     .shadow(true)
-    // 无边框自绘标题栏,底色对齐 dsh 暗色主题(亮色跟随 CSS 变量)
-    .background_color(tauri::window::Color(21, 21, 23, 255))
     .on_navigation(move |url| window::is_local_shell(url))
     .on_new_window(move |url, _features| {
         use tauri::webview::NewWindowResponse;
@@ -164,6 +162,14 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     })
     .build()
     .map_err(|e| e.to_string())?;
+    // 窗口底色跟随系统主题(与前端 CSS prefers-color-scheme 一致,避免加载前黑/白闪)
+    let theme = settings_win.theme().unwrap_or(tauri::Theme::Dark);
+    let bg = match theme {
+        tauri::Theme::Dark => tauri::window::Color(21, 21, 23, 255),
+        tauri::Theme::Light => tauri::window::Color(255, 255, 255, 255),
+        _ => tauri::window::Color(21, 21, 23, 255),
+    };
+    let _ = settings_win.set_background_color(Some(bg));
     let _ = app_handle;
     Ok(())
 }
@@ -185,6 +191,11 @@ fn status_text(payload: &str) -> String {
 }
 
 fn request_exit(app: &AppHandle) {
+    // 退出前隐藏主窗口:停服过程会短暂发出 stopped 状态,若窗口仍可见会闪现
+    // "服务已停止"页(用户已点关闭,不应再看到内容变化)。隐藏后停服+退出。
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
     if let Some(m) = app.try_state::<Arc<ServerManager>>() {
         m.stop();
     }
@@ -312,7 +323,7 @@ pub fn run() {
             // 主窗口程序化创建(以挂载导航守卫)
             let app_handle = app.handle().clone();
             let nav_handle = app.handle().clone();
-            tauri::WebviewWindowBuilder::new(
+            let main_win = tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
                 tauri::WebviewUrl::App("index.html".into()),
@@ -322,8 +333,6 @@ pub fn run() {
             .min_inner_size(900.0, 600.0)
             .decorations(false)
             .shadow(true)
-            // 无边框自绘标题栏,底色对齐 dsh 暗色主题(亮色跟随 CSS 变量)
-            .background_color(tauri::window::Color(21, 21, 23, 255))
             .on_navigation(move |url| window::navigation_guard(&nav_handle, url))
             // iframe 方案:dsh 内 target=_blank / window.open 的新窗口请求。
             // 本地壳放行(弹新窗口),dsh loopback 放行(允许内部弹窗),其余交系统浏览器。
@@ -340,6 +349,14 @@ pub fn run() {
                 }
             })
             .build()?;
+            // 窗口底色跟随系统主题(与前端 CSS prefers-color-scheme 一致,避免加载前黑/白闪)
+            let theme = main_win.theme().unwrap_or(tauri::Theme::Dark);
+            let bg = match theme {
+                tauri::Theme::Dark => tauri::window::Color(21, 21, 23, 255),
+                tauri::Theme::Light => tauri::window::Color(255, 255, 255, 255),
+                _ => tauri::window::Color(21, 21, 23, 255),
+            };
+            main_win.set_background_color(Some(bg))?;
             Ok(())
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
