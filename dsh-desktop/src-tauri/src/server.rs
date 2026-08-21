@@ -346,7 +346,16 @@ fn spawn_dsh(
     log_lines: usize,
 ) -> Result<Child, String> {
     let mut cmd = Command::new(&rt.node);
-    cmd.arg(&rt.dsh_bin).arg("web").arg("--port");
+    cmd.arg(&rt.dsh_bin).arg("web");
+    // --no-open: 桌面 WebView 是唯一界面,禁止 dsh 再调起系统浏览器(dsh web 默认会 open)。
+    // 仅对 bundled 运行时传(版本固定 0.1.0-rc.8+,确定支持);path/config 回退时的外部 dsh
+    // 可能是旧版(如 0.1.0-rc.6 不支持 --no-open),传了会 unknown option 崩溃。
+    if rt.source == "bundled" {
+        cmd.arg("--no-open");
+    } else {
+        log(logs, log_lines, "[app] runtime 非 bundled,不传 --no-open(兼容旧 dsh)");
+    }
+    cmd.arg("--port");
     match &settings.port_policy {
         PortPolicy::Auto => {
             cmd.arg("0");
@@ -728,11 +737,17 @@ fn ensure_usage_stats_bundle(
         let _ = std::fs::write(profile_dir.join("pnpm-workspace.yaml"), PROFILE_PNPM_WORKSPACE);
     }
 
-    // 补 profile 内 node_modules 链接:插件 patch 会按名 import,须从 profile 可解析
+    // 补 profile 内 node_modules 链接:插件 patch 会按名 import,须从 profile 可解析。
+    // 链接已存在但目标无效(如指向旧构建路径或旧空包)时也要重建,否则 dsh 启动会
+    // ERR_MODULE_NOT_FOUND。有效性判断:通过链接能解析到 lib/index.js。
     let nm_dir = profile_dir.join("node_modules");
     let link = nm_dir.join(BUNDLE);
-    if !link.exists() {
+    let link_valid = link.join("lib").join("index.js").is_file();
+    if !link_valid {
         let _ = std::fs::create_dir_all(&nm_dir);
+        // 清掉旧的悬空链接(reparse point 用 remove_dir_all 删除,不含目录则直接删)
+        let _ = std::fs::remove_dir_all(&link);
+        let _ = std::fs::remove_file(&link);
         #[cfg(unix)]
         {
             use std::os::unix::fs::symlink;
