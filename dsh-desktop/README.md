@@ -32,6 +32,27 @@ npm run build:app                # 前端构建 + tauri build（Windows 默认�
 
 产物位于 `src-tauri/target/release/bundle/`。
 
+### 打包版本规则（强制）
+
+> **每次重新打包，包版本号必须在当前版本基础上递增一版**（`0.1.0` → `0.1.1` → `0.1.2` …）。
+> 修改位置（三处保持一致）：
+> - `dsh-desktop/package.json` → `"version"`
+> - `dsh-desktop/src-tauri/Cargo.toml` → `[package] version`
+> - `dsh-desktop/src-tauri/tauri.conf.json` → `"version"`
+>
+> 否则多次打包会用**相同版本号覆盖安装包**，无法区分新旧产物。
+
+### 打包前流程规则（强制）
+
+> **每次修改构建完成后，必须先跑自动化测试；测试通过后由用户验证基础功能；确认没问题后，才允许打包。**
+> 流程顺序：
+> 1. 构建/编译（`npm run build`、`cargo build`、`npm run vendor` 等）
+> 2. **自动化测试**：`npm run vendor` 自带的裁剪后冒烟 + 现有验证脚本（插件 `scripts/smoke-clean-profile.mjs` 等），以及后续新增的测试
+> 3. **用户验证基础功能**：启动 app，确认 dsh UI 正常加载、核心功能可用
+> 4. 以上全部通过 → 才执行打包（`tauri build`）
+>
+> 未经验证直接打包视为违反流程。
+
 ### MSI 与 NSIS：只打一种即可（推荐 NSIS）
 
 同一份产物两种格式，**功能等价，只需生成其中一种**。实测打包耗时（本机，仅 bundler 环节、工具链已缓存）：
