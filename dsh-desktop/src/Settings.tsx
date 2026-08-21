@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import TitleBar from "./TitleBar";
 import "./App.css";
 
 type PortPolicy = { mode: "auto" } | { mode: "fixed"; port: number };
@@ -40,7 +41,9 @@ export default function SettingsView() {
   if (!s) return <div className="container">加载设置…</div>;
 
   return (
-    <main className="settings">
+    <div className="shell">
+      <TitleBar title="设置" />
+      <main className="settings">
       <h1>设置</h1>
 
       <label>
@@ -119,6 +122,7 @@ export default function SettingsView() {
           {logs.length ? logs.join("\n") : "(暂无日志)"}
         </pre>
       </section>
-    </main>
+      </main>
+    </div>
   );
 }

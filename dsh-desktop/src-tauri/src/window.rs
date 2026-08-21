@@ -30,20 +30,16 @@ pub fn navigation_guard(app: &AppHandle, url: &Url) -> bool {
     if scheme == "http" && host == "localhost" && url.port() == Some(1420) {
         return true; // dev 壳(devUrl)
     }
-    // 远程 dsh:loopback 且端口与当前服务一致
-    if host == "127.0.0.1" || host == "localhost" {
-        if let Some(port) = current_server_port(app) {
-            if url.port() == Some(port) {
-                return true;
-            }
-        }
-    }
-    // 其余:系统浏览器打开
-    let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+
+    // iframe 方案(方案 A-1):dsh UI 由 shell 页面内的 iframe 承载,顶层 WebView 只应停留在
+    // 壳页面。任何顶层导航离开壳页面(如被某段 JS 误触发的 location 跳转到 dsh URL)都会
+    // 破坏标题栏常驻布局,故一律拒绝,并打印日志便于排查来源。
+    let _ = app;
+    eprintln!("[nav-guard] 拦截顶层导航离开壳页面: {url}");
     false
 }
 
-fn current_server_port(app: &AppHandle) -> Option<u16> {
+pub fn current_server_port(app: &AppHandle) -> Option<u16> {
     let mgr = app.try_state::<Arc<ServerManager>>()?;
     match mgr.state() {
         ServerState::Running { url } => url.rsplit(':').next()?.parse().ok(),

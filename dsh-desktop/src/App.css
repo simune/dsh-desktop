@@ -3,18 +3,85 @@ html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0d1117;
+  /* 底色对齐 dsh 网页暗色主题(原 GitHub #0d1117 已统一为 dsh #151517) */
+  background: #151517;
+}
+/* 无边框窗口壳布局:标题栏常驻 + 内容区下移 */
+.shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #151517;
+  color: #e6edf3;
 }
 .container {
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 12px;
   font-family: system-ui, -apple-system, sans-serif;
-  background: #0d1117;
+  background: #151517;
   color: #e6edf3;
+}
+
+/* ===== 自绘标题栏(dsh 风格,无边框窗口用) ===== */
+.titlebar {
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+  /* 拖拽区由 data-tauri-drag-region 提供;下方元素需显式禁用拖拽 */
+}
+.tb-dark { background: #151517; color: #c9cdd4; border-bottom: 1px solid rgba(255,255,255,.06); }
+.tb-light { background: #ffffff; color: #444746; border-bottom: 1px solid rgba(0,0,0,.08); }
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 100%;
+}
+.tb-icon { flex: none; }
+.tb-title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .2px;
+  white-space: nowrap;
+}
+/* 拖拽区:占满中间剩余宽度 */
+.tb-drag { flex: 1; height: 100%; }
+.tb-controls { display: flex; align-items: center; height: 100%; }
+.tb-btn {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 0;
+  padding: 0;
+  font-size: 12px;
+  transition: background .12s ease;
+}
+.tb-dark .tb-btn:hover { background: rgba(255,255,255,.08); }
+.tb-light .tb-btn:hover { background: rgba(0,0,0,.06); }
+.tb-btn.tb-close:hover { background: #e81123; color: #fff; }
+
+/* ===== dsh 内容 iframe(方案 A-1:标题栏常驻,内容嵌入) ===== */
+.dsh-frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #151517;
 }
 h1 { font-size: 22px; margin: 0; }
 h1.err { color: #f85149; }
@@ -63,7 +130,7 @@ button.secondary { background: #30363d; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* 设置页 */
+/* 设置页(位于 .shell 内,标题栏下方) */
 .settings {
   max-width: 480px;
   margin: 0 auto;

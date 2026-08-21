@@ -76,8 +76,21 @@ fn open_settings(app: AppHandle) -> Result<(), String> {
     )
     .title("DSH Desktop 设置")
     .inner_size(540.0, 680.0)
-    .background_color(tauri::window::Color(13, 17, 23, 255))
+    .min_inner_size(480.0, 560.0)
+    .decorations(false)
+    .shadow(true)
+    // 无边框自绘标题栏,底色对齐 dsh 暗色主题(亮色跟随 CSS 变量)
+    .background_color(tauri::window::Color(21, 21, 23, 255))
     .on_navigation(move |url| window::is_local_shell(url))
+    .on_new_window(move |url, _features| {
+        use tauri::webview::NewWindowResponse;
+        if window::is_local_shell(&url) {
+            NewWindowResponse::Allow
+        } else {
+            let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+            NewWindowResponse::Deny
+        }
+    })
     .build()
     .map_err(|e| e.to_string())?;
     let _ = app_handle;
@@ -208,6 +221,7 @@ pub fn run() {
 
             // 主窗口程序化创建(以挂载导航守卫)
             let app_handle = app.handle().clone();
+            let nav_handle = app.handle().clone();
             tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
@@ -215,8 +229,26 @@ pub fn run() {
             )
             .title("DSH Desktop")
             .inner_size(1280.0, 800.0)
-            .background_color(tauri::window::Color(13, 17, 23, 255))
-            .on_navigation(move |url| window::navigation_guard(&app_handle, url))
+            .min_inner_size(900.0, 600.0)
+            .decorations(false)
+            .shadow(true)
+            // 无边框自绘标题栏,底色对齐 dsh 暗色主题(亮色跟随 CSS 变量)
+            .background_color(tauri::window::Color(21, 21, 23, 255))
+            .on_navigation(move |url| window::navigation_guard(&nav_handle, url))
+            // iframe 方案:dsh 内 target=_blank / window.open 的新窗口请求。
+            // 本地壳放行(弹新窗口),dsh loopback 放行(允许内部弹窗),其余交系统浏览器。
+            .on_new_window(move |url, _features| {
+                use tauri::webview::NewWindowResponse;
+                if window::is_local_shell(&url)
+                    || (url.host_str() == Some("127.0.0.1") || url.host_str() == Some("localhost"))
+                        && window::current_server_port(&app_handle) == url.port()
+                {
+                    NewWindowResponse::Allow
+                } else {
+                    let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+                    NewWindowResponse::Deny
+                }
+            })
             .build()?;
             Ok(())
         })
