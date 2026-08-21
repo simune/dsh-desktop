@@ -272,16 +272,22 @@ pub fn run() {
                 use tauri::Emitter;
                 let app_handle = app.handle().clone();
                 let mut last: Option<String> = None;
-                std::thread::spawn(move || {
-                    let home = dsh_home_path(&app_handle);
-                    loop {
-                        let pref = read_theme_preference(&home);
+                let mut last_mtime: Option<std::time::SystemTime> = None;
+                let settings_path = dsh_home_path(&app_handle).join("settings.yaml");
+                std::thread::spawn(move || loop {
+                    // 先用 mtime 判断文件是否变化,避免高频全量读
+                    let mtime = std::fs::metadata(&settings_path)
+                        .and_then(|m| m.modified())
+                        .ok();
+                    if mtime != last_mtime {
+                        last_mtime = mtime;
+                        let pref = read_theme_preference(settings_path.parent().unwrap_or(std::path::Path::new("")));
                         if last.as_deref() != Some(pref.as_str()) {
                             let _ = app_handle.emit("theme-changed", &pref);
                             last = Some(pref);
                         }
-                        std::thread::sleep(Duration::from_millis(400));
                     }
+                    std::thread::sleep(Duration::from_millis(100));
                 });
             }
 
