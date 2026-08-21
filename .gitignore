@@ -15,3 +15,7 @@ target/
 
 # 本地测试日志
 .m0-logs/
+
+# CodePlan 账号接入调研(临时,不入库)
+docs/codeplan-usage-stats-integration.md
+scripts/codeplan-*
