@@ -1,44 +1,62 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 
 /**
- * useTheme —— 标题栏主题跟随。
+ * useTheme —— 标题栏/加载页主题跟随 dsh 网页内的主题设置。
  *
- * dsh 网页默认主题策略为 `system`(见 dsh-client-ui-theme:
- * preference === "system" → matchMedia('(prefers-color-scheme: dark)'))。
- * 因此标题栏跟随系统 `prefers-color-scheme` 即可与 dsh 明暗切换同步。
+ * dsh 的主题偏好存于 `$DSH_HOME/settings.yaml` 的 `ui-theme.preference`
+ * (light | dark | system,默认 system)。用户可在 dsh 内手动切换深色/浅色,
+ * 该值只对 dsh iframe 生效,壳页面(跨源)读不到 iframe 的 DOM。
  *
- * 同时监听壳页面自身 body[data-ds-dark-theme] 作为扩展点(若未来壳页面
- * 也启用 dsh token 主题)。注意:dsh 内容渲染在跨源 iframe 中,其内部
- * body 属性无法被壳页面读取,故以系统主题为准。
+ * 因此这里通过 Rust 侧读取该偏好:
+ * - 启动时 invoke get_theme_preference 取当前值
+ * - Rust 后台轮询 settings.yaml,变化时 emit theme-changed
+ * - preference 优先:dark→深色,light→浅色,system/缺失→跟随 prefers-color-scheme
+ *
+ * 结果写到 <html data-theme="dark|light">,由 App.css 的属性选择器驱动全部壳页面配色。
  */
 export function useTheme(): { dark: boolean } {
-  const [dark, setDark] = useState<boolean>(() => {
-    try {
-      return window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } catch {
-      return false;
-    }
-  });
+  const [dark, setDark] = useState<boolean>(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onMq = (e: MediaQueryListEvent) => setDark(e.matches);
-    mq.addEventListener?.("change", onMq);
-
-    // 壳页面自身 body 主题属性(扩展点;当前壳页面未启用 dsh token 主题)
-    const body = document.body;
-    const onBody = () => {
-      if (body.hasAttribute("data-ds-dark-theme")) setDark(true);
-      else setDark(mq.matches);
+    let cancelled = false;
+    const systemDark = () => {
+      try {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      } catch {
+        return false;
+      }
     };
-    const mo = new MutationObserver(onBody);
-    mo.observe(body, { attributes: true, attributeFilter: ["data-ds-dark-theme"] });
+    const apply = (pref: string) => {
+      if (cancelled) return;
+      if (pref === "dark") setDark(true);
+      else if (pref === "light") setDark(false);
+      else setDark(systemDark());
+    };
+
+    invoke<string>("get_theme_preference")
+      .then(apply)
+      .catch(() => apply("system"));
+
+    let unlisten: (() => void) | undefined;
+    listen<string>("theme-changed", (e) => apply(e.payload))
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
 
     return () => {
-      mq.removeEventListener?.("change", onMq);
-      mo.disconnect();
+      cancelled = true;
+      unlisten?.();
     };
   }, []);
+
+  // 写 <html data-theme>,驱动 App.css 属性选择器
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }, [dark]);
 
   return { dark };
 }

@@ -6,8 +6,79 @@ mod window;
 
 use server::ServerManager;
 use settings::AppSettings;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
+
+/// dsh 的 settings.yaml 里 ui-theme.preference 字段(light/dark/system)。
+/// shell 的标题栏/加载页跟随该值,与 dsh 网页内主题设置保持一致
+/// (用户可在 dsh 内把主题设为深色,此时系统主题可能仍为亮色)。
+const THEME_PREF_SYSTEM: &str = "system";
+
+/// 解析客户端实际使用的 DSH_HOME(与 server.rs::resolve_dsh_home 同规则:
+/// 设置 > 环境变量 DSH_HOME > 默认 ~/.dsh)。
+/// Windows 默认目录用 USERPROFILE(USERPROFILE\.dsh);HOME 在 Windows 上通常为空,
+/// 若只查 HOME 会得到空路径,导致双击启动(无会话级 DSH_HOME)读不到主题设置。
+fn dsh_home_path(app: &AppHandle) -> PathBuf {
+    if let Some(s) = app.try_state::<Arc<Mutex<AppSettings>>>() {
+        if let Some(h) = &s.lock().unwrap().dsh_home {
+            return PathBuf::from(h);
+        }
+    }
+    if let Some(h) = std::env::var_os("DSH_HOME") {
+        return PathBuf::from(h);
+    }
+    #[cfg(windows)]
+    {
+        std::env::var_os("USERPROFILE")
+            .map(|h| PathBuf::from(h).join(".dsh"))
+            .or_else(|| {
+                std::env::var_os("HOMEDRIVE")
+                    .zip(std::env::var_os("HOMEPATH"))
+                    .map(|(d, p)| PathBuf::from(d).join(p).join(".dsh"))
+            })
+            .unwrap_or_default()
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join(".dsh"))
+            .unwrap_or_default()
+    }
+}
+
+/// 读取 dsh 的 settings.yaml 中 `ui-theme.preference` 值。
+/// 文件缺失/字段缺失返回 "system"(跟随系统主题)。
+fn read_theme_preference(home: &Path) -> String {
+    let content = match std::fs::read_to_string(home.join("settings.yaml")) {
+        Ok(c) => c,
+        Err(_) => return THEME_PREF_SYSTEM.to_string(),
+    };
+    let mut in_theme = false;
+    for line in content.lines() {
+        let t = line.trim();
+        if t == "ui-theme:" {
+            in_theme = true;
+            continue;
+        }
+        if in_theme {
+            if let Some(v) = t.strip_prefix("preference:") {
+                return v.trim().trim_matches('"').to_string();
+            }
+            // 离开了 ui-theme 段(遇到新的无缩进顶层键或注释边界)
+            if !t.is_empty() && !t.starts_with('#') && line.starts_with(|c: char| !c.is_whitespace()) {
+                return THEME_PREF_SYSTEM.to_string();
+            }
+        }
+    }
+    THEME_PREF_SYSTEM.to_string()
+}
+
+#[tauri::command]
+fn get_theme_preference(app: AppHandle) -> String {
+    read_theme_preference(&dsh_home_path(&app))
+}
 
 #[tauri::command]
 fn get_server_status(mgr: State<'_, Arc<ServerManager>>) -> server::ServerState {
@@ -184,6 +255,25 @@ pub fn run() {
                 });
             }
 
+            // 主题联动:轮询 dsh 的 settings.yaml 中 ui-theme.preference,
+            // 变化时 emit theme-changed 给前端(标题栏/加载页跟随 dsh 内主题设置)
+            {
+                use tauri::Emitter;
+                let app_handle = app.handle().clone();
+                let mut last: Option<String> = None;
+                std::thread::spawn(move || {
+                    let home = dsh_home_path(&app_handle);
+                    loop {
+                        let pref = read_theme_preference(&home);
+                        if last.as_deref() != Some(pref.as_str()) {
+                            let _ = app_handle.emit("theme-changed", &pref);
+                            last = Some(pref);
+                        }
+                        std::thread::sleep(Duration::from_millis(400));
+                    }
+                });
+            }
+
             // 测试钩子:DSH_DESKTOP_CLOSE_MS=<ms> 时,模拟点击主窗口关闭按钮(走 CloseRequested 路径)
             if let Ok(ms) = std::env::var("DSH_DESKTOP_CLOSE_MS") {
                 if let Ok(ms) = ms.parse::<u64>() {
@@ -283,7 +373,8 @@ pub fn run() {
             quit_app,
             get_settings,
             set_settings,
-            open_settings
+            open_settings,
+            get_theme_preference
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
