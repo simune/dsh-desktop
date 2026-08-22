@@ -58,11 +58,11 @@ dsh/
 
 ## 3. 已核实的关键事实(落地依据)
 
-以下事实已在本机 `@deepseek-ai/dsh@0.1.0-rc.6`(安装于 `/opt/homebrew/lib/node_modules/@deepseek-ai/dsh`)上验证:
+以下事实已在本机 `@deepseek-ai/dsh@0.1.0-rc.8`(安装于 `/opt/homebrew/lib/node_modules/@deepseek-ai/dsh`)上验证:
 
 | 事实 | 验证结果 |
 |---|---|
-| 版本 | `0.1.0-rc.6`,bin 入口 `lib/bin.js` |
+| 版本 | `0.1.0-rc.8`,bin 入口 `lib/bin.js` |
 | `web` 别名 | bin.js 硬编码:`web` = `--profile web`(L91-94) |
 | 启动命令 | `node <dsh>/lib/bin.js web --port 0` |
 | URL 输出行 | `dsh web: http://127.0.0.1:<port>`(`LOOPBACK_HOST` 恒为 `127.0.0.1`);有 LAN 候选时行尾追加 ` (LAN: http://<ip>:<port>)` |
@@ -154,7 +154,7 @@ M1.2 ─→ M3.1 / M3.2(M3 与 M2 并行)
 | R4 | 子进程残留(孙进程/SSE) | 退出后 `pgrep` 有残留 | 进程组 kill + 宽限升级(M1.3);SSE 关闭由 dsh 自身处理 | 开放 |
 | R5 | 启动超时/端口异常 | 60s 未就绪 | 错误页展示 stderr;M0.2 原型先行验证解析 | 开放 |
 | R6 | WebView 兼容问题(SSE/键盘) | M0.4 冒烟失败 | WKWebView 支持 SSE/fetch;键盘问题记录并绕过 | 开放(预计低) |
-| R7 | dsh 版本升级破坏兼容 | 升级 dsh 后启动异常 | 版本锁定 `0.1.0-rc.6`;升级随 app 发布、先验证再发 | 开放 |
+| R7 | dsh 版本升级破坏兼容 | 升级 dsh 后启动异常 | 版本锁定 `0.1.0-rc.8`;升级随 app 发布、先验证再发 | 开放 |
 | R8 | 双开各起服务端 | 连点两次图标 | 单实例(M1.5);二次启动复用 | 开放 |
 | R9 | Finder 启动 PATH 缺失导致 runtime 探测失败 | M2.3 全新机器验证 | 捆绑运行时优先(M2.2 探测链) | 开放 |
 

@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DSH_VERSION = process.env.DSH_DESKTOP_DSH_VERSION ?? '0.1.0-rc.6';
+const DSH_VERSION = process.env.DSH_DESKTOP_DSH_VERSION ?? '0.1.0-rc.8';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_DIR = process.env.DSH_DESKTOP_PLUGIN_DIR ??
   path.join(__dirname, '..', '..', 'plugins', 'dsh-usage-stats');

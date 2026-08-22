@@ -9,7 +9,7 @@
 | Rust 工具链 | `rustup` + stable;`cargo --version` 可跑 |
 | Xcode Command Line Tools | `xcode-select -p` 有输出(编译 + dmg 打包) |
 | Node ≥ 20 | 本机已装(开发期探测链用);`node --version` |
-| dsh | 本机 `/opt/homebrew/lib/node_modules/@deepseek-ai/dsh`(0.1.0-rc.6) |
+| dsh | 本机 `/opt/homebrew/lib/node_modules/@deepseek-ai/dsh`(0.1.0-rc.8) |
 
 ## 1. M0 验证
 
@@ -103,7 +103,7 @@ pgrep -f "bin.js web" | wc -l   # 退出后应为 0
 | Rust MSVC 工具链 | `rustup` + stable,含 MSVC Build Tools(VS2022 "使用 C++ 的桌面开发"工作负载);`cargo --version` 可跑 |
 | WebView2 Runtime | Win11 自带;Win10 需装(NSIS 安装器默认静默引导下载) |
 | Node ≥ 20 | 本机已装(开发期探测链用);`node --version` |
-| dsh | 本机 `npm i -g @deepseek-ai/dsh`(0.1.0-rc.6),或直接 `npm run vendor` 走 bundled |
+| dsh | 本机 `npm i -g @deepseek-ai/dsh`(0.1.0-rc.8),或直接 `npm run vendor` 走 bundled |
 
 ### 4.5.2 构建
 

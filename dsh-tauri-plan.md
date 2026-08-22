@@ -83,7 +83,7 @@
 dsh 是 Node 程序且依赖树含原生模块,运行时来源有三种,影响体积与健壮性:
 
 ### 方案 A(推荐):捆绑 Node runtime + dsh 安装树
-- 构建时 `npm install @deepseek-ai/dsh@0.1.0-rc.6` 到 `src-tauri/resources/dsh/`,Node 二进制按平台作为 resource/`externalBin` 打进安装包
+- 构建时 `npm install @deepseek-ai/dsh@0.1.0-rc.8` 到 `src-tauri/resources/dsh/`,Node 二进制按平台作为 resource/`externalBin` 打进安装包
 - 启动:`<resources>/node <resources>/dsh/lib/bin.js web --port 0`
 - 优点:完全自包含,不依赖用户机器上有 node/dsh;Finder 启动时 PATH 缺失也不怕;可锁定 dsh 版本
 - 代价:体积大(342MB 依赖树 + ~60-90MB/node 平台二进制),可用 `npm i --omit=dev` 与"只保留 web profile 所需 bundle 闭包"裁剪(列为优化项,目标 ≤200MB)
@@ -142,7 +142,7 @@ dsh-desktop/
 | app 升级后 bundle 路径变化导致旧符号链接悬空 | 下次启动自愈,无影响 |
 | 子进程残留(孙进程/SSE 连接) | 进程组 kill + 宽限升级;退出时 `closeAllConnections` 由 dsh 自身处理 |
 | WebView 兼容(SSE/fetch/键盘) | macOS WKWebView 支持;M0 即验证 |
-| 版本锁定 | dsh 版本随 app 发布;`package.json` 固定 `0.1.0-rc.6` |
+| 版本锁定 | dsh 版本随 app 发布;`package.json` 固定 `0.1.0-rc.8` |
 
 ## 7. 决策记录(已确认)
 

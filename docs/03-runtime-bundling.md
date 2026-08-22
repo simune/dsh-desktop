@@ -31,11 +31,11 @@ tauri.conf.json 资源映射(`docs/04` §2):`resources/` 全部进 app bundle �
 # 等价命令(脚本内用 child_process 执行并校验)
 mkdir -p src-tauri/resources/dsh
 cd src-tauri/resources/dsh
-npm install @deepseek-ai/dsh@0.1.0-rc.6 \
+npm install @deepseek-ai/dsh@0.1.0-rc.8 \
   --omit=dev --no-audit --no-fund --no-package-lock=false
 ```
 
-- 版本**硬编码锁定**在脚本常量 + `package.json`(dependencies 固定 `0.1.0-rc.6`)。
+- 版本**硬编码锁定**在脚本常量 + `package.json`(dependencies 固定 `0.1.0-rc.8`)。
 - 用 `npm ci`(有 lockfile 时)保证可复现。
 - 完成后把安装树根 `package.json` 的 version 写入 `runtime-manifest.json`。
 
@@ -125,7 +125,7 @@ resolve_runtime(cfg) -> (node_path, dsh_dir):
 
 ## 8. 版本与升级策略
 
-- **锁定**:dsh 固定 `0.1.0-rc.6`(方案 §7);升级 = 修改 vendor 脚本版本常量 → 重新 vendor → 全量回归(`docs/05`)。
+- **锁定**:dsh 固定 `0.1.0-rc.8`(方案 §7);升级 = 修改 vendor 脚本版本常量 → 重新 vendor → 全量回归(`docs/05`)。
 - **升级体验**:内置 dsh 随 app 分发,升级 dsh 即换新版 app(覆盖安装);旧 app 生成的 `profiles/node_modules` 符号链接指向旧 bundle 路径 → 新版本首次启动由 dsh 自愈逻辑重建(方案 §6 R3,已在 M3.4 验证)。
 - 不引入自动更新器(v1 个人自用);如需,后续评估 `tauri-plugin-updater`。
 
