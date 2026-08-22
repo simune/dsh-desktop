@@ -91,6 +91,10 @@ function App() {
             src={runningUrl}
             title="DSH"
             allow="clipboard-read; clipboard-write"
+            // 禁止 iframe 内冲顶导航(无 allow-top-navigation*):
+            // dsh 侧若改 window.top.location,顶层会被拉到 127.0.0.1;
+            // navigation_guard 拒绝后 macOS WKWebView 常留空白页。
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
           />
         ) : isError ? (
           <>

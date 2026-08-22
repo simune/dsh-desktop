@@ -226,8 +226,9 @@ fn server_loop(
         set_state(&state, ServerState::Running { url: url.clone() });
         emit_status(&app, &state);
         log(&logs, log_lines, &format!("[app] running: {url}"));
-        // 由 Rust 导航主窗口:覆盖初始加载与崩溃重启后窗口停留在旧 URL 的场景
-        navigate_webview(&app, &url);
+        // 方案 A-1:dsh UI 由壳页面 iframe 承载,顶层 WebView 不主动离开壳。
+        // 只 emit server-status / 更新 get_server_status,由前端挂 iframe。
+        // 勿在此 navigate 到 dsh URL(会整页替换壳、弄丢自绘标题栏)。
 
         let serve = loop {
             if rx.recv_timeout(Duration::from_millis(200)).is_ok() {
