@@ -12,6 +12,7 @@
     "build:app": "npm run vendor && npm run build && tauri build",
     "build:app:nsis": "npm run vendor && npm run build && tauri build --bundles nsis",
     "build:app:msi": "npm run vendor && npm run build && tauri build --bundles msi",
+    "build:release": "node scripts/build-release.mjs",
     "clean:apple-double": "node scripts/clean-apple-double.mjs",
     "vendor": "node scripts/vendor-node.mjs && node scripts/vendor-dsh.mjs"
   },
